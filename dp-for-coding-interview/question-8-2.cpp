@@ -1,68 +1,84 @@
 #include <bits/stdc++.h>
 using namespace std;
 typedef int64_t i64;
+enum piece_t { vert = 1, horz };
 typedef tuple<i64, i64, i64> board_t;
-set<board_t> boards_found;
-int solve_d(int n1, int n2, int n3, const string& tab = "") {
-  clog << tab << '(' << n1 << ',' << n2 << ',' << n3 << ')';
-  if (n1 < 0 || n2 < 0 || n3 < 0) {
-    clog << " X" << endl;
-    return 0;
-  }
-  if (!n1 && !n2 && !n3) {
-    clog << " v/ +1" << endl;
-    return 1;
-  }
+int N;
 
-  clog << endl;
+set<board_t> boards;
+set<tuple<i64, i64, i64, board_t>> memo;
 
-  string t = tab + "--";
-  int r1 = solve_d(n1 - 1, n2 - 1, n3    , t);
-  int r2 = solve_d(n1,     n2 - 1, n3 - 1, t);
-
-  int r3 = solve_d(n1 - 2, n2    , n3    , t);
-  int r4 = solve_d(n1    , n2 - 2, n3    , t);
-  int r5 = solve_d(n1    , n2    , n3 - 2, t);
-
-  return r1 + r2 + r3 + r4 + r5;
-}
-board_t new_board(const board_t& board, int row, int col) {
-  if (row < 0 || col < 0) return board;
-  auto [r1, r2, r3] = board;
-  i64 r;
-  switch (row) {
-    case 0: r = r1; break;
-    case 1: r = r2; break;
-    case 2: r = r3; break;
-  }
-  r |= (3 << col);
-  switch (row) {
-    case 0:  return {r , r2, r3};
-    case 1:  return {r1, r , r3};
-    default: return {r1, r2, r };
-  }
+board_t set_ver_piece_at(const board_t& b, int row, int col) {
+  if (col < 1 || row < 1) return b;
+  int c = col - 1;
+  int r = row - 1;
+  array<i64, 3> ns {get<0>(b), get<1>(b), get<2>(b)};
+  int mask = vert << (2 * c);
+  ns[r] |= mask;
+  ns[r + 1] |= mask;
+  return {ns[0], ns[1], ns[2]};
 }
 
-int solve(int n1, int n2, int n3, board_t board) {
+board_t set_hor_piece_at(const board_t& b, int row, int col) {
+  if (col < 2 || row < 1) return b;
+  int c = col - 1;
+  int r = row - 1;
+  array<i64, 3> ns {get<0>(b), get<1>(b), get<2>(b)};
+  ns[r] |= (10 << (2 * (c - 1)));
+  return {ns[0], ns[1], ns[2]};
+}
+
+bool is_ver_free(const int row, const int col, const board_t& b) {
+  if (!row || !col) return false;
+  int r = row - 1;
+  int c = col - 1;
+  array<i64, 3> ns{get<0>(b), get<1>(b), get<2>(b)};
+
+  i64 n1 = ns[r] & (3 << (2 * c));
+  i64 n2 = ns[r + 1] & (3 << (2 * c));
+  return !n1 && !n2;
+}
+
+bool is_hor_free(const int row, const int col, const board_t& b) {
+  if (col < 2) return false;
+  if (!row || !col) return false;
+  int r = row - 1;
+  int c = col - 1;
+  array<i64, 3> ns{get<0>(b), get<1>(b), get<2>(b)};
+
+  i64 n = ns[r];
+  return !(n & (15 << (2 * (c - 1))));
+}
+
+int find_all(int n1, int n2, int n3, const board_t& b) {
+  tuple<i64, i64, i64, board_t> t = make_tuple(n1, n2, n3, b);
+  if (memo.count(t)) return 0;
+
   if (n1 < 0 || n2 < 0 || n3 < 0) return 0;
-  if (!n1 && !n2 && !n3 && !boards_found.count(board)) {
-    boards_found.insert(board);
+  if (!n1 && !n2 && !n3 && !boards.count(b)) {
+    boards.insert(b);
     return 1;
   }
 
-  int r1 = solve(n1 - 1, n2 - 1, n3    , board);
-  int r2 = solve(n1,     n2 - 1, n3 - 1, board);
+  int total = 0;
+  if (is_hor_free(1, n1, b))
+    total += find_all(n1 - 2, n2, n3, set_hor_piece_at(b, 1, n1));
+  if (is_hor_free(2, n2, b))
+    total += find_all(n1, n2 - 2, n3, set_hor_piece_at(b, 2, n2));
+  if (is_hor_free(3, n3, b))
+    total += find_all(n1, n2, n3 - 2, set_hor_piece_at(b, 3, n3));
 
-  int r3 = solve(n1 - 2, n2    , n3    , new_board(board, 0, n1 - 2));
-  int r4 = solve(n1    , n2 - 2, n3    , new_board(board, 1, n2 - 2));
-  int r5 = solve(n1    , n2    , n3 - 2, new_board(board, 2, n3 - 2));
+  if (is_ver_free(1, n1, b))
+    total += find_all(n1 - 1, n2 - 1, n3, set_ver_piece_at(b, 1, n1));
+  if (is_ver_free(2, n2, b))
+    total += find_all(n1, n2 - 1, n3 - 1, set_ver_piece_at(b, 2, n2));
 
-  return r1 + r2 + r3 + r4 + r5;
+  memo.insert(t);
+  return total;
 }
 int main() {
-  size_t n; // cin >> n;
-  n = 2;
-  assert(n < 64);
-  cout << solve(n, n, n, {0, 0, 0}) << '\n';
+  int n; cin >> n;
+  N = n;
+  cout << find_all(n, n, n, {0, 0, 0}) << '\n';
   return 0;
 }
