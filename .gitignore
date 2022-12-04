@@ -1,7 +1,8 @@
+.DS_Store
 .idea/
 .project
 .classpath
 target/
 dp-for-coding-interview/*
 !dp-for-coding-interview/*.*
-
+cmake-build-debug/
