@@ -1,6 +1,6 @@
-# Exercises for books/tutorials read
+# Exercises for books (or tutorials)
 
-Some of the books read/reading:
+List of books:
 
 * [Dynamic Programming for the coding
 interview](https://www.amazon.com.au/Dynamic-Programming-Coding-Interviews-Bottom-Up-ebook/dp/B06XZ61CMP)
