@@ -101,50 +101,46 @@ uint32_t load_shader() {
   BOOST_LOG_TRIVIAL(trace) << "vertex shader: " << vertex_shader_src;
   const char* const_vertex_shader_src = vertex_shader_src.c_str();
 
-  uint32_t vertex_shader_id = glCreateShader(GL_VERTEX_SHADER);
+  uint32_t vertex_shader_handler = glCreateShader(GL_VERTEX_SHADER);
   glShaderSource( //
-      vertex_shader_id, // shader id
+      vertex_shader_handler, // shader id
       1, // count
       &const_vertex_shader_src, //
       nullptr // length
   );
-  glCompileShader(vertex_shader_id);
-  auto comp_res = check_shader_compilation(vertex_shader_id);
-  if (comp_res) {
-    return abort_program("Error compiling vert shader: " + comp_res.value());
+  glCompileShader(vertex_shader_handler);
+  if (auto res = check_shader_compilation(vertex_shader_handler); res) {
+    return abort_program("Error compiling vert shader: " + res.value());
   }
 
   const std::string fragment_shader_src(load_shader_content("tut.frag"));
   BOOST_LOG_TRIVIAL(trace) << "fragment shader: " << fragment_shader_src;
   const char* const_fragment_shader_src = fragment_shader_src.c_str();
 
-  uint32_t fragment_shader_id = glCreateShader(GL_FRAGMENT_SHADER);
+  uint32_t fragment_shader_handler = glCreateShader(GL_FRAGMENT_SHADER);
   glShaderSource(
-      fragment_shader_id, //
+      fragment_shader_handler, //
       1, // count
       &const_fragment_shader_src, //
       nullptr // length
   );
-  glCompileShader(fragment_shader_id);
-  comp_res = check_shader_compilation(fragment_shader_id);
-  if (comp_res) {
-    return abort_program("Error compiling frag shader: " + comp_res.value());
+  glCompileShader(fragment_shader_handler);
+  if (auto res = check_shader_compilation(fragment_shader_handler); res) {
+    return abort_program("Error compiling frag shader: " + res.value());
   }
 
-  uint32_t shader_program_id = glCreateProgram();
-  glAttachShader(shader_program_id, vertex_shader_id);
-  glAttachShader(shader_program_id, fragment_shader_id);
-  glLinkProgram(shader_program_id);
-  auto link_res = check_shader_linking(shader_program_id);
-  if (link_res) {
-    return abort_program("Error linking shader: " + link_res.value());
+  uint32_t shader_program_handler = glCreateProgram();
+  glAttachShader(shader_program_handler, vertex_shader_handler);
+  glAttachShader(shader_program_handler, fragment_shader_handler);
+  glLinkProgram(shader_program_handler);
+  if (auto res = check_shader_linking(shader_program_handler); res) {
+    return abort_program("Error linking shader: " + res.value());
   }
 
-  //glUseProgram(shader_program_id);
-  glDeleteShader(vertex_shader_id);
-  glDeleteShader(fragment_shader_id);
+  glDeleteShader(vertex_shader_handler);
+  glDeleteShader(fragment_shader_handler);
 
-  return shader_program_id;
+  return shader_program_handler;
 }
 
 GLFWwindow* create_ogl_window() {
@@ -192,6 +188,11 @@ int main() {
      0.5f, -0.5f, 0.0f,
      0.0f,  0.5f, 0.0f
   };
+
+  uint32_t vao_handle;
+  glGenVertexArrays(/* of VBAs to generate */ 1, &vao_handle);
+  glBindVertexArray(vao_handle);
+
   uint32_t vbo_handle;
   glGenBuffers(/* num of VBOs to generate */ 1, &vbo_handle);
   glBindBuffer(GL_ARRAY_BUFFER, vbo_handle);
@@ -206,9 +207,10 @@ int main() {
       static_cast<void*>(nullptr) // position data offset in the buffer
   );
   glEnableVertexAttribArray(/* attribute index = */ 0);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glBindVertexArray(0);
 
   auto shader_program_handle = load_shader();
-  glUseProgram(shader_program_handle);
 
   // render loop
   while(!glfwWindowShouldClose(window)) {
@@ -217,6 +219,10 @@ int main() {
 
     glClearColor(0.2f, 0.3f, 0.3f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
+
+    glUseProgram(shader_program_handle);
+    glBindVertexArray(vao_handle);
+    glDrawArrays(GL_TRIANGLES, /* start index = */ 0, /* vertex count = */ 3);
 
     // check and call events and swap buffers
     glfwSwapBuffers(window);

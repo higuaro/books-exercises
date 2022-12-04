@@ -21,7 +21,7 @@ add_subdirectory(lib/glad/)
 # Adds the DEBUG definition for the DEBUG build
 add_compile_options("$<$<CONFIG:DEBUG>:-DDEBUG>")
 
-add_executable(gl_tut src/cxx/main.cpp)
+add_executable(gl_tut src/cxx/hello-triangle.cpp)
 
 # Copy the content of the 'res' folder into the executable build path
 add_custom_command(TARGET gl_tut POST_BUILD
