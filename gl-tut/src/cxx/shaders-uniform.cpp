@@ -1,14 +1,11 @@
 #include <iostream>
 #include <string>
-#include <sstream>
 #include <optional>
-#include <chrono>
 
 #include <boost/filesystem.hpp>
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
 #include <boost/log/utility/setup/file.hpp>
 
 #include "glad/glad.h"
@@ -49,8 +46,8 @@ std::string load_shader_content(const std::string& file_name) {
   }
   fs::ifstream shader_file(file_path);
   return { //
-    std::istreambuf_iterator<char>(shader_file), //
-    std::istreambuf_iterator<char>() //
+      std::istreambuf_iterator<char>(shader_file), //
+      std::istreambuf_iterator<char>() //
   };
 }
 
@@ -97,8 +94,8 @@ std::optional<std::string> check_shader_linking(const uint32_t shader_id) {
   return check_shader_status(shader_id, GL_LINK_STATUS);
 }
 
-uint32_t load_shader() {
-  const std::string vertex_shader_src(load_shader_content("tut.vert"));
+uint32_t load_shader(const std::string& shader_id) {
+  const std::string vertex_shader_src(load_shader_content(shader_id + ".vert"));
   BOOST_LOG_TRIVIAL(trace) << "vertex shader: " << vertex_shader_src;
   const char* const_vertex_shader_src = vertex_shader_src.c_str();
 
@@ -114,7 +111,7 @@ uint32_t load_shader() {
     return abort_program("Error compiling vert shader: " + res.value());
   }
 
-  const std::string fragment_shader_src(load_shader_content("tut.frag"));
+  const std::string fragment_shader_src(load_shader_content(shader_id + ".frag"));
   BOOST_LOG_TRIVIAL(trace) << "fragment shader: " << fragment_shader_src;
   const char* const_fragment_shader_src = fragment_shader_src.c_str();
 
@@ -227,7 +224,8 @@ int main() {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-  auto shader_program_handle = load_shader();
+  auto shader_program_handle = load_shader("shaders-uniform");
+  int uni_our_color = glGetUniformLocation(shader_program_handle, "our_color");
 
   // render loop
   while(!glfwWindowShouldClose(window)) {
@@ -240,10 +238,8 @@ int main() {
     glUseProgram(shader_program_handle);
     glBindVertexArray(vao_handle);
 
-    using namespace std::chrono;
-    auto sec = duration_cast<seconds>(system_clock::now().time_since_epoch());
-
-    glPolygonMode(GL_FRONT_AND_BACK, (sec % 10) >= 5s ? GL_LINE : GL_FILL);
+    auto green = static_cast<float>(sin(glfwGetTime()) / 2.0) + 0.5f;
+    glUniform4f(uni_our_color, 1.0f, green, 0.0f, 1.0f);
 
     glDrawElements( //
         GL_TRIANGLES, //
@@ -260,4 +256,3 @@ int main() {
   glfwTerminate();
   return 0;
 }
-

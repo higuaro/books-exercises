@@ -1,14 +1,11 @@
 #include <iostream>
 #include <string>
-#include <sstream>
 #include <optional>
-#include <chrono>
 
 #include <boost/filesystem.hpp>
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/expressions.hpp>
 #include <boost/log/utility/setup/file.hpp>
 
 #include "glad/glad.h"
@@ -49,8 +46,8 @@ std::string load_shader_content(const std::string& file_name) {
   }
   fs::ifstream shader_file(file_path);
   return { //
-    std::istreambuf_iterator<char>(shader_file), //
-    std::istreambuf_iterator<char>() //
+      std::istreambuf_iterator<char>(shader_file), //
+      std::istreambuf_iterator<char>() //
   };
 }
 
@@ -97,8 +94,8 @@ std::optional<std::string> check_shader_linking(const uint32_t shader_id) {
   return check_shader_status(shader_id, GL_LINK_STATUS);
 }
 
-uint32_t load_shader() {
-  const std::string vertex_shader_src(load_shader_content("tut.vert"));
+uint32_t load_shader(const std::string& shader_id) {
+  const std::string vertex_shader_src(load_shader_content(shader_id + ".vert"));
   BOOST_LOG_TRIVIAL(trace) << "vertex shader: " << vertex_shader_src;
   const char* const_vertex_shader_src = vertex_shader_src.c_str();
 
@@ -114,7 +111,7 @@ uint32_t load_shader() {
     return abort_program("Error compiling vert shader: " + res.value());
   }
 
-  const std::string fragment_shader_src(load_shader_content("tut.frag"));
+  const std::string fragment_shader_src(load_shader_content(shader_id + ".frag"));
   BOOST_LOG_TRIVIAL(trace) << "fragment shader: " << fragment_shader_src;
   const char* const_fragment_shader_src = fragment_shader_src.c_str();
 
@@ -190,10 +187,14 @@ int main() {
   glViewport(0, 0, 800, 600);
 
   float vertices[] = {
-      0.5f,  0.5f, 0.0f,  // top right
-      0.5f, -0.5f, 0.0f,  // bottom right
-      -0.5f, -0.5f, 0.0f, // bottom left
-      -0.5f,  0.5f, 0.0f  // top left
+      0.5f,  0.5f, 0.0f,  // top right (red)
+      1.0f,  0.0f, 0.0f,  //
+      0.5f, -0.5f, 0.0f,  // bottom right (green)
+      0.0f,  1.0f, 0.0f,  //
+      -0.5f, -0.5f, 0.0f, // bottom left (blue)
+      0.0f,  0.0f,  1.0f, //
+      -0.5f,  0.5f, 0.0f, // top left (yellow)
+      1.0f,  1.0f,  0.0f  //
   };
   uint32_t indices[] = {
       0, 1, 3, // first triangle
@@ -214,20 +215,33 @@ int main() {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_handle);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof indices, indices, GL_STATIC_DRAW);
 
+  // position attribute
   glVertexAttribPointer(
       0, // vertex attribute to configure
       3, // size of the vertex attribute (vec3)
       GL_FLOAT, // attribute type (vec* in GLSL consists of floats)
       GL_FALSE, // if integer data should be normalized
-      3 * sizeof(float), // stride
+      6 * sizeof(float), // stride
       nullptr // position data offset in the buffer
   );
   glEnableVertexAttribArray(/* attribute index = */ 0);
+
+  // color attribute
+  glVertexAttribPointer(
+      1, // vertex attribute to configure
+      3, // size of the vertex attribute (vec3)
+      GL_FLOAT, // attribute type (vec* in GLSL consists of floats)
+      GL_FALSE, // if integer data should be normalized
+      6 * sizeof(float), // stride
+      reinterpret_cast<void*>(3 * sizeof(float)) // data offset in the buffer
+  );
+  glEnableVertexAttribArray(/* attribute index = */ 1);
+
   glBindVertexArray(0);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-  auto shader_program_handle = load_shader();
+  auto shader_program_handle = load_shader("shaders-more-atts");
 
   // render loop
   while(!glfwWindowShouldClose(window)) {
@@ -239,11 +253,6 @@ int main() {
 
     glUseProgram(shader_program_handle);
     glBindVertexArray(vao_handle);
-
-    using namespace std::chrono;
-    auto sec = duration_cast<seconds>(system_clock::now().time_since_epoch());
-
-    glPolygonMode(GL_FRONT_AND_BACK, (sec % 10) >= 5s ? GL_LINE : GL_FILL);
 
     glDrawElements( //
         GL_TRIANGLES, //
@@ -260,4 +269,3 @@ int main() {
   glfwTerminate();
   return 0;
 }
-

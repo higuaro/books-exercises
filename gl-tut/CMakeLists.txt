@@ -22,7 +22,10 @@ add_subdirectory(lib/glad/)
 add_compile_options("$<$<CONFIG:DEBUG>:-DDEBUG>")
 
 # add_executable(gl_tut src/cxx/hello-triangle.cpp)
-add_executable(gl_tut src/cxx/ebo.cpp)
+# add_executable(gl_tut src/cxx/ebo.cpp)
+# add_executable(gl_tut src/cxx/shaders-uniform.cpp)
+add_executable(gl_tut src/cxx/shaders-more-atts.cpp)
+
 
 # Copy the content of the 'res' folder into the executable build path
 add_custom_command(TARGET gl_tut POST_BUILD
