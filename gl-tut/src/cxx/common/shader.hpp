@@ -114,7 +114,7 @@ private:
 
 public:
 
-  inline uint32_t handle() const {
+  [[nodiscard]] inline uint32_t handle() const {
     return shader_program_handler;
   }
 
