@@ -21,16 +21,17 @@ add_subdirectory(lib/glad/)
 # Adds the DEBUG definition for the DEBUG build
 add_compile_options("$<$<CONFIG:DEBUG>:-DDEBUG>")
 
-# add_executable(gl_tut src/cxx/hello-triangle.cpp)
-# add_executable(gl_tut src/cxx/ebo.cpp)
-# add_executable(gl_tut src/cxx/shaders-uniform.cpp)
-add_executable(gl_tut src/cxx/shaders-more-atts.cpp)
+foreach(program hello-triangle ebo shaders-uniform shaders-more-atts)
+  add_executable(${program} src/cxx/ch1/${program}.cpp)
+
+  target_include_directories(${program} PUBLIC ${GLFW_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include/)
+
+  target_link_libraries(${program} Boost::filesystem Boost::log PkgConfig::GLFW glad)
+
+  # Copy the content of the 'res' folder into the executable build path
+  add_custom_command(TARGET ${program} POST_BUILD
+          COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${CMAKE_SOURCE_DIR}/res $<TARGET_FILE_DIR:${program}>/res)
+endforeach()
 
 
-# Copy the content of the 'res' folder into the executable build path
-add_custom_command(TARGET gl_tut POST_BUILD
-                   COMMAND ${CMAKE_COMMAND} -E copy_directory
-                   ${CMAKE_SOURCE_DIR}/res $<TARGET_FILE_DIR:gl_tut>/res)
-
-target_include_directories(gl_tut PUBLIC ${GLFW_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/include/)
-target_link_libraries(gl_tut Boost::filesystem Boost::log PkgConfig::GLFW glad)
