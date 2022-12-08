@@ -1,15 +1,13 @@
 #include <iostream>
 #include <string>
-#include <optional>
 
 #include <boost/filesystem.hpp>
 
 #include <boost/log/core.hpp>
 #include <boost/log/trivial.hpp>
-#include <boost/log/utility/setup/file.hpp>
 
 #include "glad/glad.h"
-#include "../common/shader.hpp"
+#include "../common/shader_program.hpp"
 #include <GLFW/glfw3.h>
 
 namespace fs = boost::filesystem;
@@ -150,8 +148,8 @@ int main() {
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
   glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-  shader more_atts_shader("shaders-more-atts");
-  if (auto res = more_atts_shader.load(); res) {
+  shader_program shader("shaders-more-atts");
+  if (auto res = shader.load(); res) {
     return abort_program(res.value());
   }
 
@@ -163,7 +161,7 @@ int main() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(more_atts_shader.handle());
+    glUseProgram(shader.program_handle());
     glBindVertexArray(vao_handle);
 
     glDrawElements( //
