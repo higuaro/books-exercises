@@ -132,7 +132,7 @@ int main() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(shader.program_handle());
+    shader.use();
     glBindVertexArray(vao_handle);
     glDrawArrays(GL_TRIANGLES, /* start index = */ 0, /* vertex count = */ 3);
 

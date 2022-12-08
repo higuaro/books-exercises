@@ -137,11 +137,6 @@ int main() {
   if (auto res = shader.load(); res) {
     return abort_program(res.value());
   }
-  auto uniform_or_err = shader.get_uniform("our_color");
-  if (holds_alternative<std::string>(uniform_or_err)) {
-    return abort_program(get<std::string>(uniform_or_err));
-  }
-  auto uniform_our_color = get<shader_program::uniform_t>(uniform_or_err);
 
   // render loop
   while(!glfwWindowShouldClose(window)) {
@@ -151,11 +146,11 @@ int main() {
     glClearColor(0.2f, 0.3f, 0.3f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glUseProgram(shader.program_handle());
+    shader.use();
     glBindVertexArray(vao_handle);
 
     auto green = static_cast<float>(sin(glfwGetTime()) / 2.0) + 0.5f;
-    shader.set_uniform_value_4f(uniform_our_color, 1.0f, green, 0.0f, 1.0f);
+    shader.set_uniform_value_4f("our_color", 1.0f, green, 0.0f, 1.0f);
 
     glDrawElements( //
         GL_TRIANGLES, //
