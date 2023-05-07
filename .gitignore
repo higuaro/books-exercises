@@ -6,3 +6,5 @@ target/
 dp-for-coding-interview/*
 !dp-for-coding-interview/*.*
 cmake-build-debug/
+
+at26/atari2600.pdf
