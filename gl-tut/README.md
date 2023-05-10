@@ -6,4 +6,5 @@ Libraries installed:
 sudo apt install pkg-config 
 sudo apt install libglfw3-dev
 sudo apt install libboost-all-dev
+sudo apt install libstb-dev
 ```
