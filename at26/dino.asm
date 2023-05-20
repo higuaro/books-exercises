@@ -1,25 +1,51 @@
   processor 6502
 
   include "vcs.h"
+  list on
+; -----------------------------------------------------------------------------
+; MACROS
+; -----------------------------------------------------------------------------
+  mac DEC_Y_AND_END_SCANLINE
+    ; These 2 instructions take place at the end of the scanline
+    dey                 ; 2
+    sta WSYNC           ; 3
+    ; Both sta HMOVE and BNE happen at the beginning of all but the 1st scanline
+    ; thus each of the remaining 191 scanlines starts with 6 cycles
+    sta HMOVE           ; 3
+    bne _kernel         ; 3/4 Within the contex of this macro this branch will
+                        ;     be always taken, but it might cross page boundary
+                        ;     hence the 4
+                        ;
+                        ; 11/12 cycles to start/finish the scanline :(
+  endm
+
+  mac DEBUG_SUB_KERNEL
+.BGCOLOR set {1}
+    lda #.BGCOLOR
+    sta COLUBK
+    DEC_Y_AND_END_SCANLINE
+  endm
 
 ; -----------------------------------------------------------------------------
-;   CONSTANTS
+; CONSTANTS
 ; -----------------------------------------------------------------------------
+KERNEL_TABLE_BASE = $fc00
 
-RANDOM_MEM_0 = $c1
-RANDOM_MEM_1 = $e5
+RND_MEM_LOC_1 = $c1   ; "random" memory locations to sample the upper/lower 
+RND_MEM_LOC_2 = $e5   ; bytes when the machine starts. 
 
 BKG_LIGHT_GRAY = #13
 DINO_HEIGHT = 39
 
 ; -----------------------------------------------------------------------------
-;   MEMORY / VARIABLES
+; MEMORY / VARIABLES
 ; -----------------------------------------------------------------------------
   seg.u variables
   org $80
 
-RND_SEED .word ; 2 bytes
-DINO_Y .byte   ; 3 bytes
+CURRENT_SUB_KERNEL .word ; 2 bytes
+RND_SEED .word           ; 4 bytes
+DINO_Y .byte             ; 5 bytes
 
 ; -----------------------------------------------------------------------------
 ; ROM / CODE
@@ -35,13 +61,13 @@ on_reset:
   cld     ; (CLear Decimal) disable BCD math
 
   ; At the start, the machine memory could be in any state, and that's good!
-  ; I can use those leftovers for the random seed before doing a ZP cleaning
+  ; We can use those leftovers for the random seed before doing a ZP cleaning
   lda <RND_SEED
-  adc RANDOM_MEM_0
+  adc RND_MEM_LOC_1
   sta <RND_SEED
   ;
   lda >RND_SEED
-  adc RANDOM_MEM_1
+  adc RND_MEM_LOC_2
   sta >RND_SEED
 
   ; -----------------------
@@ -55,11 +81,17 @@ __clear_mem:
   txs
   pha
   bne __clear_mem
+
   ; -----------------------
-  ; INITIALIZATION
+  ; GAME INITIALIZATION
   ; -----------------------
-  lda #80
+  lda #$51
   sta DINO_Y
+
+  lda <#__score_kernel_setup
+  sta CURRENT_SUB_KERNEL
+  lda >#__score_kernel_setup
+  sta CURRENT_SUB_KERNEL+1
 
   ; -----------------------
   ; FRAME
@@ -68,7 +100,7 @@ on_frame:
 
 _vsync_and_vblank:
   ; last line of overscan
-  inc <RND_SEED
+  ;inc <RND_SEED
   sta WSYNC
 
   ; -----------------------
@@ -76,17 +108,14 @@ _vsync_and_vblank:
   ; -----------------------
 __vsync:
   lda #2
-  sta VSYNC  ; VSYNC = A (A=2) enables vsync
-    inc <RND_SEED
-    lda #0
-    adc >RND_SEED
-  sta WSYNC
+  sta VBLANK ; Enable VBLANK (and turn off video signal)
+  sta VSYNC  ; VBLANK = VSYNC = A (A=2) enables vsync/vblank
     inc <RND_SEED
     adc >RND_SEED
-  sta WSYNC
-    inc <RND_SEED
-    adc >RND_SEED
-  sta WSYNC
+  sta WSYNC  ; 1st line of vsync
+  sta WSYNC  ; 2nd line of vsync
+    lda #0   ; A <- 0
+  sta WSYNC  ; 3rd (final) line of vsync
   sta VSYNC  ; VSYNC = A (A=0) disables vsync
 
   ; -----------------------
@@ -97,98 +126,76 @@ __vsync:
   lda #43
   sta TIM64T
 
-  ; frame update logic
+  ; -----------------------
+  ; FRAME SETUP/LOGIC
+  ; -----------------------
   lda #BKG_LIGHT_GRAY
   sta COLUBK
+  sta HMCLR    ; Clear horizontal motion registers
 
   lda #0
 __vblank:
   lda INTIM
-    inc <RND_SEED
-    adc >RND_SEED
   bne __vblank 
                ; 2752 cycles + 2 from bne, 2754 (out of 2812 vblank)
-  sta HMCLR    ; Clear horizontal motion registers
   sta WSYNC
   sta VBLANK   ; Disables VBLANK (A=0)
+  sta HMOVE
 
 ; -----------------------------------------------------------------------------
-; KERNEL
+; BEGIN KERNEL
 ; -----------------------------------------------------------------------------
   ldy #192
 _kernel:
-  ;sta HMCLR            ; 3
-  ; book routine
-  ; ================
-  ; txa                ; 2
-  ; sec                ; 2
-  ; sbc YPos           ; 3
-  ; cmp #SpriteHeight  ; 2
-  ; bcc InSprite       ; 2/3 = 11/12 cycles
+  lda KERNEL_TABLE_BASE,y         ; 5
+  sta CURRENT_SUB_KERNEL          ; 3
+  lda KERNEL_TABLE_BASE+1,y       ; 5
+  sta CURRENT_SUB_KERNEL+1        ; 3
+  jmp (CURRENT_SUB_KERNEL)        ; 5 - 21 cycles just to start the line!!! NAH
 
-  ; Both a BNE and sta HMOVE happen at the beginning of all but the 1st scanline
-  ; thus we start each of the remaining relevant 191 scalines with 6 cycles
-  ; bne _kernel        ; 3
-  ; sta HMOVE          ; 3
-  ; ================
-  ; Dino sprite section
-  sec                  ; 2
-  tya                  ; 2
-  sbc DINO_Y           ; 3
-  cmp #DINO_HEIGHT     ; 2
-  bcs __no_dino        ; 2/3 = 11/12 cycles (total so far 17/18)
+__score_kernel_setup:
+  DEBUG_SUB_KERNEL #$10
 
-  ; Branch not taken, 17 cycles
-  ;
+__score_kernel:
+  DEBUG_SUB_KERNEL #$20
 
+__clouds_kernel_setup:
+  DEBUG_SUB_KERNEL #$30
 
-; Load dino sprite data
-  tax                  ; 2
-  lda DINO_TAIL,X      ; 4
-  sta GRP0             ; 3
-  lda DINO_HEAD_0,X    ; 4
-  sta GRP1             ; 3 (total so far 16 + 17 = 33 cycles)
-  sta RESP0            ; 3  38 cycles, f(38) = 10px
-  sta RESP1            ; 3  41 cycles
+__clouds_kernel:
+  DEBUG_SUB_KERNEL #$40
 
-  lda $10              ; 2  graphics for player 1 offset 1px left
-  sta HMP1             ; 3  fine positioning for the dino head
-  ; Formula for horizontal position in pixels
-  ; f(cycles) = (cycles - 23 [HBLANK]) / 3 [TIA] + 5 [TIA HOR DELAY]
+__sky_kernel_setup:
+  DEBUG_SUB_KERNEL #$50
 
-  lda #2
-  sta ENAM0
-  sta RESM0
+__sky_kernel:
+  DEBUG_SUB_KERNEL #$60
 
+__cactus_kernel_setup:
+  DEBUG_SUB_KERNEL #$70
 
-__no_dino:  ; if branch taken, 12 cycles
-  nop
+__cactus_kernel:
+  DEBUG_SUB_KERNEL #$80
 
+__floor_kernel:
+  DEBUG_SUB_KERNEL #$AA
 
-  lda #0
-  sta ENAM0
-
-
-  dey                  ; 2
-  sta WSYNC            ; 3
-  sta HMOVE            ; 3
-  bne _kernel          ; 2/3
-
+; -----------------------------------------------------------------------------
+; END KERNEL
 ; -----------------------------------------------------------------------------
 
   ; -----------------------
   ; OVERSCAN (30 scanlines)
   ; -----------------------
   ; 30 lines of OVERSCAN, 30 * 76 / 64 = 35
-  lda #35
+  lda #30
   sta TIM64T
   lda #2
   sta VBLANK
-  lda #0
 __overscan:
   lda INTIM
     inc <RND_SEED
-    adc >RND_SEED
+    ;adc >RND_SEED
   bne __overscan
 
   ; We're on the final OVERSCAN line and 40 cpu cycles remain,
@@ -196,6 +203,22 @@ __overscan:
   ; beginning of the next frame to consume the rest
   jmp on_frame
 
+  seg data
+; -----------------------------------------------------------------------------
+; KERNEL TABLE
+; -----------------------------------------------------------------------------
+; A table to store the jump labels for the different kernel sub-sections
+  org #KERNEL_TABLE_BASE
+
+  ds.w #2, __score_kernel_setup
+  ds.w #8, __score_kernel
+  ds.w #2, __clouds_kernel_setup
+  ds.w #10, __clouds_kernel
+  ds.w #2, __sky_kernel_setup
+  ds.w #10, __sky_kernel
+  ds.w #2, __cactus_kernel_setup
+  ds.w #10, __cactus_kernel
+  ds.w #2, __floor_kernel
 
 ; -----------------------------------------------------------------------------
 ; SPRITE GRAPHICS DATA
@@ -287,10 +310,10 @@ DINO_HEAD_0:
   .byte #%11111110
   .byte #%11111110
 
+
 ; -----------------------------------------------------------------------------
 ; ROM SETUP
 ; -----------------------------------------------------------------------------
   org $fffc
     .word on_reset ; reset button signal
     .word on_reset ; IRQ
-
