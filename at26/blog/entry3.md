@@ -12,3 +12,11 @@ need to sta WSYNC and let the next kernel do its part. Oh my God I'm such an...
 
 Anyway! Let's try that, although, I don't feel like doing anything at the moment
 to be honest. 
+
+Finally, I got it. The kernel paints the different sections in different colors,
+now I can start tackling each section individually. But I'm still feeling like
+crap from covid so I'll stop for today. The section sizes are not even accurate
+but it's ok, I'll adjust those as I go along. I left a screenshot from today's
+progress.
+
+[img](./entry3-1.png)

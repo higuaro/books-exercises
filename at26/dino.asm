@@ -5,32 +5,22 @@
 ; -----------------------------------------------------------------------------
 ; MACROS
 ; -----------------------------------------------------------------------------
-  mac DEC_Y_AND_END_SCANLINE
-    ; These 2 instructions take place at the end of the scanline
-    dey                 ; 2
-    sta WSYNC           ; 3
-    ; Both sta HMOVE and BNE happen at the beginning of all but the 1st scanline
-    ; thus each of the remaining 191 scanlines starts with 6 cycles
-    sta HMOVE           ; 3
-    bne _kernel         ; 3/4 Within the contex of this macro this branch will
-                        ;     be always taken, but it might cross page boundary
-                        ;     hence the 4
-                        ;
-                        ; 11/12 cycles to start/finish the scanline :(
-  endm
 
   mac DEBUG_SUB_KERNEL
 .BGCOLOR set {1}
+.KERNEL_LINES set {2}
     lda #.BGCOLOR
     sta COLUBK
-    DEC_Y_AND_END_SCANLINE
+    ldx #.KERNEL_LINES
+.loop:
+    dex
+    sta WSYNC
+    bne .loop
   endm
 
 ; -----------------------------------------------------------------------------
 ; CONSTANTS
 ; -----------------------------------------------------------------------------
-KERNEL_TABLE_BASE = $fc00
-
 RND_MEM_LOC_1 = $c1   ; "random" memory locations to sample the upper/lower 
 RND_MEM_LOC_2 = $e5   ; bytes when the machine starts. 
 
@@ -145,40 +135,34 @@ __vblank:
 ; -----------------------------------------------------------------------------
 ; BEGIN KERNEL
 ; -----------------------------------------------------------------------------
-  ldy #192
 _kernel:
-  lda KERNEL_TABLE_BASE,y         ; 5
-  sta CURRENT_SUB_KERNEL          ; 3
-  lda KERNEL_TABLE_BASE+1,y       ; 5
-  sta CURRENT_SUB_KERNEL+1        ; 3
-  jmp (CURRENT_SUB_KERNEL)        ; 5 - 21 cycles just to start the line!!! NAH
 
 __score_kernel_setup:
-  DEBUG_SUB_KERNEL #$10
+  DEBUG_SUB_KERNEL #$10, #2
 
 __score_kernel:
-  DEBUG_SUB_KERNEL #$20
-
+  DEBUG_SUB_KERNEL #$20, #10
+;
 __clouds_kernel_setup:
-  DEBUG_SUB_KERNEL #$30
+  DEBUG_SUB_KERNEL #$30, #2
 
 __clouds_kernel:
-  DEBUG_SUB_KERNEL #$40
+  DEBUG_SUB_KERNEL #$40, #20
 
 __sky_kernel_setup:
-  DEBUG_SUB_KERNEL #$50
+  DEBUG_SUB_KERNEL #$50, #2
 
 __sky_kernel:
-  DEBUG_SUB_KERNEL #$60
-
-__cactus_kernel_setup:
-  DEBUG_SUB_KERNEL #$70
+  DEBUG_SUB_KERNEL #$60, #30
 
 __cactus_kernel:
-  DEBUG_SUB_KERNEL #$80
+  DEBUG_SUB_KERNEL #$80, #30
 
 __floor_kernel:
-  DEBUG_SUB_KERNEL #$AA
+  DEBUG_SUB_KERNEL #$AA, #5
+
+__void_kernel:
+  DEBUG_SUB_KERNEL #$FA, #91
 
 ; -----------------------------------------------------------------------------
 ; END KERNEL
@@ -203,26 +187,10 @@ __overscan:
   ; beginning of the next frame to consume the rest
   jmp on_frame
 
-  seg data
-; -----------------------------------------------------------------------------
-; KERNEL TABLE
-; -----------------------------------------------------------------------------
-; A table to store the jump labels for the different kernel sub-sections
-  org #KERNEL_TABLE_BASE
-
-  ds.w #2, __score_kernel_setup
-  ds.w #8, __score_kernel
-  ds.w #2, __clouds_kernel_setup
-  ds.w #10, __clouds_kernel
-  ds.w #2, __sky_kernel_setup
-  ds.w #10, __sky_kernel
-  ds.w #2, __cactus_kernel_setup
-  ds.w #10, __cactus_kernel
-  ds.w #2, __floor_kernel
-
 ; -----------------------------------------------------------------------------
 ; SPRITE GRAPHICS DATA
 ; -----------------------------------------------------------------------------
+  seg data
   org $fe00
 
   ; -----------------------------------------------
