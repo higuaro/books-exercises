@@ -1,14 +1,15 @@
-  processor 6502
+  PROCESSOR 6502
 
-  include "vcs.h"
-  list on
-; -----------------------------------------------------------------------------
+  INCLUDE "vcs.h"
+  LIST ON           ; turn on program listing, for debugging on Stella
+
+;=============================================================================
 ; MACROS
-; -----------------------------------------------------------------------------
+;=============================================================================
 
-  mac DEBUG_SUB_KERNEL
-.BGCOLOR set {1}
-.KERNEL_LINES set {2}
+  MAC DEBUG_SUB_KERNEL
+.BGCOLOR SET {1}
+.KERNEL_LINES SET {2}
     lda #.BGCOLOR
     sta COLUBK
     ldx #.KERNEL_LINES
@@ -16,37 +17,49 @@
     dex
     sta WSYNC
     bne .loop
-  endm
+  ENDM
 
-; -----------------------------------------------------------------------------
+;=============================================================================
+; SUBROUTINES
+;=============================================================================
+
+; empty atm
+
+;=============================================================================
 ; CONSTANTS
-; -----------------------------------------------------------------------------
-RND_MEM_LOC_1 = $c1   ; "random" memory locations to sample the upper/lower 
-RND_MEM_LOC_2 = $e5   ; bytes when the machine starts. 
+;=============================================================================
+RND_MEM_LOC_1 = $c1   ; "random" memory locations to sample the upper/lower
+RND_MEM_LOC_2 = $e5   ; bytes when the machine starts.
 
 BKG_LIGHT_GRAY = #13
-DINO_HEIGHT = 39
+DINO_HEIGHT = #39
+DINO_X = #10                 ; fixed, the dino remains locked in its x position
+DINO_X_DIV_5 = DINO_X / #5   ;
 
-; -----------------------------------------------------------------------------
+SKY_KERNEL_LINES = #62
+CACTUS_KERNEL_LINES = #62
+
+;=============================================================================
 ; MEMORY / VARIABLES
-; -----------------------------------------------------------------------------
-  seg.u variables
-  org $80
+;=============================================================================
+  SEG.U variables
+  ORG $80
 
-CURRENT_SUB_KERNEL .word ; 2 bytes
-RND_SEED .word           ; 4 bytes
-DINO_Y .byte             ; 5 bytes
+RND_SEED .word           ; 2 bytes
+DINO_Y .byte             ; 3 bytes
+BG_COLOUR .byte          ; 4 bytes
+CUR_DINO_SPRITE .word    ; 6 bytes
 
-; -----------------------------------------------------------------------------
-; ROM / CODE
-; -----------------------------------------------------------------------------
-  seg code
-  org $f000
+;=============================================================================
+; ROM / GAME CODE
+;=============================================================================
+  SEG code
+  ORG $f000
 
   ; -----------------------
   ; RESET
   ; -----------------------
-on_reset:
+reset:
   sei     ; SEt Interruption disable
   cld     ; (CLear Decimal) disable BCD math
 
@@ -78,17 +91,20 @@ __clear_mem:
   lda #$51
   sta DINO_Y
 
-  lda <#__score_kernel_setup
-  sta CURRENT_SUB_KERNEL
-  lda >#__score_kernel_setup
-  sta CURRENT_SUB_KERNEL+1
+  lda #BKG_LIGHT_GRAY
+  sta BG_COLOUR
 
-  ; -----------------------
-  ; FRAME
-  ; -----------------------
-on_frame:
+  lda DINO_SPRITE_1
+  sta <CUR_DINO_SPRITE
+  lda DINO_SPRITE_1+1
+  sta >CUR_DINO_SPRITE
 
-_vsync_and_vblank:
+;=============================================================================
+; FRAME
+;=============================================================================
+frame:
+
+.vsync_and_vblank:
   ; last line of overscan
   ;inc <RND_SEED
   sta WSYNC
@@ -123,165 +139,158 @@ __vsync:
   sta COLUBK
   sta HMCLR    ; Clear horizontal motion registers
 
+  ;lda 
+
   lda #0
 __vblank:
   lda INTIM
-  bne __vblank 
+  bne __vblank
                ; 2752 cycles + 2 from bne, 2754 (out of 2812 vblank)
   sta WSYNC
   sta VBLANK   ; Disables VBLANK (A=0)
-  sta HMOVE
+  ;sta HMOVE
 
-; -----------------------------------------------------------------------------
+;=============================================================================
 ; BEGIN KERNEL
-; -----------------------------------------------------------------------------
-_kernel:
+;=============================================================================
+kernel:
 
-__score_kernel_setup:
+.score_kernel_setup:
   DEBUG_SUB_KERNEL #$10, #2
 
-__score_kernel:
+.score_kernel:
   DEBUG_SUB_KERNEL #$20, #10
-;
-__clouds_kernel_setup:
+
+.clouds_kernel_setup:
   DEBUG_SUB_KERNEL #$30, #2
 
-__clouds_kernel:
+.clouds_kernel:
   DEBUG_SUB_KERNEL #$40, #20
 
-__sky_kernel_setup:
-  DEBUG_SUB_KERNEL #$50, #2
+.sky_kernel_setup: ; >>> 2 lines <<<
+  lda BG_COLOUR    ; 3
+  sta COLUBK       ; 3
 
-__sky_kernel:
-  DEBUG_SUB_KERNEL #$60, #30
+  ; Set the dino x position and keep it fixed for the rest of the kernel
+  ; by doing this, I lose GRP0 forever but feels that I can save some cycles
+  ldx #DINO_X_DIV_5
+__dino_coarse_pos:
+  dex
+  bne __dino_coarse_pos
+  sta RESMP0 ; M0 will be 3 cycles (9 px) far from P0
+  sta RESP0
+  sta WSYNC
 
-__cactus_kernel:
-  DEBUG_SUB_KERNEL #$80, #30
+  ;-----------------------------------
+  ; Get ready for the .sky_kernel
+  ;-----------------------------------
+  ldx #SKY_KERNEL_LINES  ; 62 lines atm
+  ldy #0
 
-__floor_kernel:
-  DEBUG_SUB_KERNEL #$AA, #5
+  ; T0D0: later set the coarse position of the cactus or pterodactile
+  sta WSYNC
 
-__void_kernel:
-  DEBUG_SUB_KERNEL #$FA, #91
+.sky_kernel:
+  lda (CUR_DINO_SPRITE),y
+  sta GRP0
+  dex
+  sta WSYNC
+  bne .sky_kernel
 
-; -----------------------------------------------------------------------------
+  ldx #SKY_KERNEL_LINES  ; 62 lines atm
+.cactus_kernel: ; 62 lines atm
+  lda (CUR_DINO_SPRITE),y
+  sta GRP0
+  iny
+  dex
+  sta WSYNC
+  bne .cactus_kernel
+
+.floor_kernel:
+  DEBUG_SUB_KERNEL #$AA, #1
+
+.gravel_kernel:
+  DEBUG_SUB_KERNEL #$C8, #9
+
+.void_kernel:
+  DEBUG_SUB_KERNEL #$FA, #31
+
+;=============================================================================
 ; END KERNEL
-; -----------------------------------------------------------------------------
+;=============================================================================
 
   ; -----------------------
   ; OVERSCAN (30 scanlines)
   ; -----------------------
   ; 30 lines of OVERSCAN, 30 * 76 / 64 = 35
-  lda #30
+  lda #35
   sta TIM64T
   lda #2
   sta VBLANK
-__overscan:
+.overscan:
   lda INTIM
-    inc <RND_SEED
+    ;inc <RND_SEED
     ;adc >RND_SEED
-  bne __overscan
+  bne .overscan
 
   ; We're on the final OVERSCAN line and 40 cpu cycles remain,
   ; do the jump now to consume some cycles and a WSYNC at the 
   ; beginning of the next frame to consume the rest
-  jmp on_frame
+  jmp frame
 
-; -----------------------------------------------------------------------------
+;=============================================================================
 ; SPRITE GRAPHICS DATA
-; -----------------------------------------------------------------------------
-  seg data
-  org $fe00
+;=============================================================================
+  SEG data
+  ORG $fe00
 
   ; -----------------------------------------------
   ; Graphics Data from PlayerPal 2600
   ; https://alienbill.com/2600/playerpalnext.html
   ; -----------------------------------------------
 
-DINO_TAIL:
-  .byte #%00000000
-  .byte #%00000000
-  .byte #%00011000
-  .byte #%00011000
-  .byte #%00010000
-  .byte #%00010000
-  .byte #%00011000
-  .byte #%00011000
-  .byte #%00011101
-  .byte #%00011101
-  .byte #%00111111
-  .byte #%00111111
-  .byte #%01111111
-  .byte #%01111111
-  .byte #%11111111
-  .byte #%11111111
-  .byte #%11111111
-  .byte #%11111111
-  .byte #%11001111
-  .byte #%11001111
-  .byte #%10000111
-  .byte #%10000111
-  .byte #%10000011
-  .byte #%10000011
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000001
-  .byte #%00000000
-  .byte #%00000000
-  
-DINO_HEAD_0:
-  .byte #%00000000
-  .byte #%00000000
-  .byte #%11000000
-  .byte #%11000000
-  .byte #%10000000
-  .byte #%10000000
-  .byte #%10000000
-  .byte #%10000000
-  .byte #%10000000
-  .byte #%10000000
-  .byte #%11000000
-  .byte #%11000000
-  .byte #%11000000
-  .byte #%11000000
-  .byte #%11100000
-  .byte #%11100000
-  .byte #%11101000
-  .byte #%11101000
-  .byte #%11111000
-  .byte #%11111000
-  .byte #%11100000
-  .byte #%11100000
-  .byte #%11100000
-  .byte #%11100000
-  .byte #%11111100
-  .byte #%11111100
-  .byte #%11110000
-  .byte #%11110000
-  .byte #%11111111
-  .byte #%11111111
-  .byte #%11111111
-  .byte #%11111111
-  .byte #%11111111
-  .byte #%11111111
-  .byte #%10111111
-  .byte #%10111111
-  .byte #%11111110
-  .byte #%11111110
+DINO_SPRITE_1:
+  .ds 50
+  .byte %11111110
+  .byte %11111110
+  .byte %10111111
+  .byte %10111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111000
+  .byte %11111000
+  .byte %11111110
+  .byte %11111110
+  .byte %00011111
+  .byte %00011111
+  .byte %00111111
+  .byte %00111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111101
+  .byte %11111101
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11101100
+  .byte %11101100
+  .byte %11000100
+  .byte %11000100
+  .byte %10000100
+  .byte %10000100
+  .byte %11000110
+  .byte %11000110
+  .ds 50
 
-
-; -----------------------------------------------------------------------------
+;=============================================================================
 ; ROM SETUP
-; -----------------------------------------------------------------------------
-  org $fffc
-    .word on_reset ; reset button signal
-    .word on_reset ; IRQ
+;=============================================================================
+  ORG $fffc
+  .word reset ; reset button signal
+  .word reset ; IRQ
