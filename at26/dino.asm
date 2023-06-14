@@ -1,6 +1,8 @@
   PROCESSOR 6502
 
   INCLUDE "vcs.h"
+  INCLUDE "macro.h"
+
   LIST ON           ; turn on program listing, for debugging on Stella
 
 ;=============================================================================
@@ -17,6 +19,15 @@
     dex
     sta WSYNC
     bne .loop
+  ENDM
+
+  MAC LOAD_PTR
+.POINTER SET {1}
+.ADDRESS SET {2}
+    lda #<.ADDRESS
+    sta .POINTER
+    lda #>.ADDRESS
+    sta .POINTER+1
   ENDM
 
 ;=============================================================================
@@ -48,7 +59,7 @@ CACTUS_KERNEL_LINES = #62
 RND_SEED .word           ; 2 bytes
 DINO_Y .byte             ; 3 bytes
 BG_COLOUR .byte          ; 4 bytes
-CUR_DINO_SPRITE .word    ; 6 bytes
+PTR_DINO_SPRITE .word    ; 6 bytes
 
 ;=============================================================================
 ; ROM / GAME CODE
@@ -65,13 +76,13 @@ reset:
 
   ; At the start, the machine memory could be in any state, and that's good!
   ; We can use those leftovers for the random seed before doing a ZP cleaning
-  lda <RND_SEED
+  lda #<RND_SEED
   adc RND_MEM_LOC_1
-  sta <RND_SEED
+  sta RND_SEED
   ;
-  lda >RND_SEED
+  lda #>RND_SEED
   adc RND_MEM_LOC_2
-  sta >RND_SEED
+  sta RND_SEED+1
 
   ; -----------------------
   ; CLEAR ZERO PAGE MEMORY
@@ -94,10 +105,7 @@ __clear_mem:
   lda #BKG_LIGHT_GRAY
   sta BG_COLOUR
 
-  lda DINO_SPRITE_1
-  sta <CUR_DINO_SPRITE
-  lda DINO_SPRITE_1+1
-  sta >CUR_DINO_SPRITE
+  LOAD_PTR PTR_DINO_SPRITE, DINO_SPRITE_1
 
 ;=============================================================================
 ; FRAME
@@ -191,15 +199,16 @@ __dino_coarse_pos:
   sta WSYNC
 
 .sky_kernel:
-  lda (CUR_DINO_SPRITE),y
+  lda (PTR_DINO_SPRITE),y
   sta GRP0
+  iny
   dex
   sta WSYNC
   bne .sky_kernel
 
   ldx #SKY_KERNEL_LINES  ; 62 lines atm
 .cactus_kernel: ; 62 lines atm
-  lda (CUR_DINO_SPRITE),y
+  lda (PTR_DINO_SPRITE),y
   sta GRP0
   iny
   dex
@@ -250,7 +259,7 @@ __dino_coarse_pos:
   ; -----------------------------------------------
 
 DINO_SPRITE_1:
-  .ds 50
+  .ds 90
   .byte %11111110
   .byte %11111110
   .byte %10111111
@@ -286,8 +295,46 @@ DINO_SPRITE_1:
   .byte %10000100
   .byte %11000110
   .byte %11000110
-  .ds 50
+  .ds 25
 
+DINO_MIS_OFFSET:
+  .ds 90
+  .byte %11111110
+  .byte %11111110
+  .byte %10111111
+  .byte %10111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111000
+  .byte %11111000
+  .byte %11111110
+  .byte %11111110
+  .byte %00011111
+  .byte %00011111
+  .byte %00111111
+  .byte %00111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111101
+  .byte %11111101
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11111111
+  .byte %11101100
+  .byte %11101100
+  .byte %11000100
+  .byte %11000100
+  .byte %10000100
+  .byte %10000100
+  .byte %11000110
+  .byte %11000110
+  .ds 25
 ;=============================================================================
 ; ROM SETUP
 ;=============================================================================
