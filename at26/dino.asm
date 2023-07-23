@@ -1,7 +1,6 @@
   PROCESSOR 6502
 
   INCLUDE "vcs.h"
-  INCLUDE "macro.h"
 
   LIST ON           ; turn on program listing, for debugging on Stella
 
@@ -21,9 +20,9 @@
     bne .loop
   ENDM
 
-  MAC LOAD_PTR
-.POINTER SET {1}
-.ADDRESS SET {2}
+  MAC LOAD_ADDRESS_TO_PTR
+.ADDRESS SET {1}
+.POINTER SET {2}
     lda #<.ADDRESS
     sta .POINTER
     lda #>.ADDRESS
@@ -40,12 +39,13 @@
 ; CONSTANTS
 ;=============================================================================
 RND_MEM_LOC_1 = $c1   ; "random" memory locations to sample the upper/lower
-RND_MEM_LOC_2 = $e5   ; bytes when the machine starts.
+RND_MEM_LOC_2 = $e5   ; bytes when the machine starts. Hopefully this finds
+                      ; some garbage values that can be used as seed
 
 BKG_LIGHT_GRAY = #13
 DINO_HEIGHT = #39
-DINO_X = #10                 ; fixed, the dino remains locked in its x position
-DINO_X_DIV_5 = DINO_X / #5   ;
+DINO_X = #10                 ; Fixed, the dino remains locked in its x position
+DINO_X_DIV_5 = DINO_X / #5   ; for the whole game
 
 SKY_KERNEL_LINES = #62
 CACTUS_KERNEL_LINES = #62
@@ -57,7 +57,7 @@ CACTUS_KERNEL_LINES = #62
   ORG $80
 
 RND_SEED .word           ; 2 bytes
-DINO_Y .byte             ; 3 bytes
+DINO_BOTTOM_Y .byte      ; 3 bytes DINO_Y + DINO_HEIGHT
 BG_COLOUR .byte          ; 4 bytes
 PTR_DINO_SPRITE .word    ; 6 bytes
 
@@ -75,7 +75,7 @@ reset:
   cld     ; (CLear Decimal) disable BCD math
 
   ; At the start, the machine memory could be in any state, and that's good!
-  ; We can use those leftovers for the random seed before doing a ZP cleaning
+  ; We can use those leftover bytes as seed for RND before doing cleaning ZP
   lda #<RND_SEED
   adc RND_MEM_LOC_1
   sta RND_SEED
@@ -92,20 +92,20 @@ reset:
   tay     ; Y = A = X = 0
 __clear_mem:
   dex
-  txs
-  pha
+  txs  ; This is the classic trick that exploits the fact that both
+  pha  ; the stack and ZP RAM are the very same 128 bytes
   bne __clear_mem
 
   ; -----------------------
   ; GAME INITIALIZATION
   ; -----------------------
-  lda #$51
-  sta DINO_Y
+  lda #$10+#DINO_HEIGHT
+  sta DINO_BOTTOM_Y
 
   lda #BKG_LIGHT_GRAY
   sta BG_COLOUR
 
-  LOAD_PTR PTR_DINO_SPRITE, DINO_SPRITE_1
+  LOAD_ADDRESS_TO_PTR DINO_SPRITE_1, PTR_DINO_SPRITE
 
 ;=============================================================================
 ; FRAME
@@ -113,17 +113,18 @@ __clear_mem:
 frame:
 
 .vsync_and_vblank:
-  ; last line of overscan
+  lda #2     ;
+  sta VBLANK ; Enables VBLANK (and turns video signal off)
+
   ;inc <RND_SEED
+  ; last line of overscan
   sta WSYNC
 
   ; -----------------------
   ; V-SYNC (3 scanlines)
   ; -----------------------
 __vsync:
-  lda #2
-  sta VBLANK ; Enable VBLANK (and turn off video signal)
-  sta VSYNC  ; VBLANK = VSYNC = A (A=2) enables vsync/vblank
+  sta VSYNC  ; Enables VSYNC
     inc <RND_SEED
     adc >RND_SEED
   sta WSYNC  ; 1st line of vsync
@@ -143,9 +144,9 @@ __vsync:
   ; -----------------------
   ; FRAME SETUP/LOGIC
   ; -----------------------
-  lda #BKG_LIGHT_GRAY
-  sta COLUBK
-  sta HMCLR    ; Clear horizontal motion registers
+  lda #BKG_LIGHT_GRAY   ;
+  sta COLUBK            ; Set initial background
+  sta HMCLR             ; Clear horizontal motion registers
 
   ;lda 
 
@@ -163,57 +164,67 @@ __vblank:
 ;=============================================================================
 kernel:
 
-.score_kernel_setup:
+.score_kernel_setup:;---->>> 2 scanlines <<<----
   DEBUG_SUB_KERNEL #$10, #2
 
-.score_kernel:
+.score_kernel:;---------->>> 10 scanlines <<<---
   DEBUG_SUB_KERNEL #$20, #10
 
-.clouds_kernel_setup:
+.clouds_kernel_setup:;-->>> 2 scanlines <<<-----
   DEBUG_SUB_KERNEL #$30, #2
 
-.clouds_kernel:
+.clouds_kernel:;-------->>> 20 scanlines <<<----
   DEBUG_SUB_KERNEL #$40, #20
 
-.sky_kernel_setup: ; >>> 2 lines <<<
+.sky_kernel_setup:;----->>> 2 scanlines <<<-----
   lda BG_COLOUR    ; 3
   sta COLUBK       ; 3
 
-  ; Set the dino x position and keep it fixed for the rest of the kernel
-  ; by doing this, I lose GRP0 forever but feels that I can save some cycles
+  ; Fix the dino_x position for the rest of the kernel
   ldx #DINO_X_DIV_5
 __dino_coarse_pos:
   dex
   bne __dino_coarse_pos
+  ; beam should be now at dino X (coarse dino x)
   sta RESMP0 ; M0 will be 3 cycles (9 px) far from P0
   sta RESP0
   sta WSYNC
 
-  ;-----------------------------------
-  ; Get ready for the .sky_kernel
-  ;-----------------------------------
-  ldx #SKY_KERNEL_LINES  ; 62 lines atm
-  ldy #0
-
-  ; T0D0: later set the coarse position of the cactus or pterodactile
+  ; T0D0: set the coarse position of the cactus/pterodactile
   sta WSYNC
-
+  
+  ;-----------------------------------
+  ; Prepare for the .sky_kernel
+  ;-----------------------------------
+  ldx #SKY_KERNEL_LINES    ; The sky is 62 scanlines
 .sky_kernel:
+  txa  ; A <- current scanline (Y)
+  sbc DINO_BOTTOM_Y ; dino bottom y + 1
+  adc #DINO_HEIGHT+1
+  bcc __skip_dino_in_sky
+  tay
   lda (PTR_DINO_SPRITE),y
   sta GRP0
-  iny
+
+__skip_dino_in_sky:
   dex
   sta WSYNC
   bne .sky_kernel
 
   ldx #SKY_KERNEL_LINES  ; 62 lines atm
 .cactus_kernel: ; 62 lines atm
-  lda (PTR_DINO_SPRITE),y
-  sta GRP0
-  iny
-  dex
-  sta WSYNC
-  bne .cactus_kernel
+  DEBUG_SUB_KERNEL #$90, #62
+  ; txa  ; A <- current scanline (Y)
+  ; sbc DINO_BOTTOM_Y ; dino bottom y + 1
+  ; adc #DINO_HEIGHT+1
+  ; bcc __skip_dino_in_catcus
+  ; tay
+  ; lda (PTR_DINO_SPRITE),y
+  ; sta GRP0
+
+; __skip_dino_in_catcus:
+;   dex
+;   bne .cactus_kernel
 
 .floor_kernel:
   DEBUG_SUB_KERNEL #$AA, #1
@@ -241,7 +252,6 @@ __dino_coarse_pos:
     ;inc <RND_SEED
     ;adc >RND_SEED
   bne .overscan
-
   ; We're on the final OVERSCAN line and 40 cpu cycles remain,
   ; do the jump now to consume some cycles and a WSYNC at the 
   ; beginning of the next frame to consume the rest
@@ -250,8 +260,8 @@ __dino_coarse_pos:
 ;=============================================================================
 ; SPRITE GRAPHICS DATA
 ;=============================================================================
-  SEG data
-  ORG $fe00
+  ;SEG data
+  ;ORG $fe00
 
   ; -----------------------------------------------
   ; Graphics Data from PlayerPal 2600
@@ -259,82 +269,82 @@ __dino_coarse_pos:
   ; -----------------------------------------------
 
 DINO_SPRITE_1:
-  .ds 90
-  .byte %11111110
-  .byte %11111110
-  .byte %10111111
-  .byte %10111111
+  .ds 1
+  .byte %11000110
+  .byte %11000110
+  .byte %10000100
+  .byte %10000100
+  .byte %11000100
+  .byte %11000100
+  .byte %11101100
+  .byte %11101100
   .byte %11111111
   .byte %11111111
   .byte %11111111
   .byte %11111111
-  .byte %11111111
-  .byte %11111000
-  .byte %11111000
-  .byte %11111110
-  .byte %11111110
-  .byte %00011111
-  .byte %00011111
-  .byte %00111111
-  .byte %00111111
   .byte %11111111
   .byte %11111111
   .byte %11111101
   .byte %11111101
   .byte %11111111
   .byte %11111111
+  .byte %00111111
+  .byte %00111111
+  .byte %00011111
+  .byte %00011111
+  .byte %11111110
+  .byte %11111110
+  .byte %11111000
+  .byte %11111000
   .byte %11111111
   .byte %11111111
   .byte %11111111
   .byte %11111111
-  .byte %11101100
-  .byte %11101100
-  .byte %11000100
-  .byte %11000100
-  .byte %10000100
-  .byte %10000100
-  .byte %11000110
-  .byte %11000110
-  .ds 25
+  .byte %11111111
+  .byte %10111111
+  .byte %10111111
+  .byte %11111110
+  .byte %11111110
+  .ds 1
 
 DINO_MIS_OFFSET:
-  .ds 90
-  .byte %11111110
-  .byte %11111110
-  .byte %10111111
-  .byte %10111111
+  .ds 1
+  .byte %11000110
+  .byte %11000110
+  .byte %10000100
+  .byte %10000100
+  .byte %11000100
+  .byte %11000100
+  .byte %11101100
+  .byte %11101100
   .byte %11111111
   .byte %11111111
   .byte %11111111
   .byte %11111111
-  .byte %11111111
-  .byte %11111000
-  .byte %11111000
-  .byte %11111110
-  .byte %11111110
-  .byte %00011111
-  .byte %00011111
-  .byte %00111111
-  .byte %00111111
   .byte %11111111
   .byte %11111111
   .byte %11111101
   .byte %11111101
   .byte %11111111
   .byte %11111111
+  .byte %00111111
+  .byte %00111111
+  .byte %00011111
+  .byte %00011111
+  .byte %11111110
+  .byte %11111110
+  .byte %11111000
+  .byte %11111000
   .byte %11111111
   .byte %11111111
   .byte %11111111
   .byte %11111111
-  .byte %11101100
-  .byte %11101100
-  .byte %11000100
-  .byte %11000100
-  .byte %10000100
-  .byte %10000100
-  .byte %11000110
-  .byte %11000110
-  .ds 25
+  .byte %11111111
+  .byte %10111111
+  .byte %10111111
+  .byte %11111110
+  .byte %11111110
+  .ds 1
 ;=============================================================================
 ; ROM SETUP
 ;=============================================================================
