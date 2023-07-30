@@ -43,7 +43,7 @@ RND_MEM_LOC_2 = $e5   ; bytes when the machine starts. Hopefully this finds
                       ; some garbage values that can be used as seed
 
 BKG_LIGHT_GRAY = #13
-DINO_HEIGHT = #39
+DINO_HEIGHT = #37
 DINO_X = #10                 ; Fixed, the dino remains locked in its x position
 DINO_X_DIV_5 = DINO_X / #5   ; for the whole game
 
@@ -190,26 +190,26 @@ __dino_coarse_pos:
   sta RESP0
   sta WSYNC
 
+  ldx #SKY_KERNEL_LINES    ; The sky is 62 scanlines
   ; T0D0: set the coarse position of the cactus/pterodactile
   sta WSYNC
-  
-  ;-----------------------------------
-  ; Prepare for the .sky_kernel
-  ;-----------------------------------
-  ldx #SKY_KERNEL_LINES    ; The sky is 62 scanlines
+
 .sky_kernel:
-  txa  ; A <- current scanline (Y)
-  sbc DINO_BOTTOM_Y ; dino bottom y + 1
-  adc #DINO_HEIGHT+1
-  bcc __skip_dino_in_sky
-  tay
-  lda (PTR_DINO_SPRITE),y
-  sta GRP0
+  txa  ; A <- current scanline (Y)            ; 2
+  sbc DINO_BOTTOM_Y ; dino bottom y + 1       ; 3
+  adc #DINO_HEIGHT+1                          ; 2
+  bcc __skip_dino_in_sky                      ; 2/3
+  tay                                         ; 2
+  lda (PTR_DINO_SPRITE),y                     ; 5+
+  sta GRP0                                    ; 3
+  lda DINO_SPRITE_OFFSET,y                    ; 4+
+  sta HMP0                                    ; 3
 
 __skip_dino_in_sky:
-  dex
-  sta WSYNC
-  bne .sky_kernel
+  dex                                         ; 2
+  sta WSYNC                                   ; 3
+  sta HMOVE                                   ; 3
+  bne .sky_kernel                             ; 2/3
 
   ldx #SKY_KERNEL_LINES  ; 62 lines atm
 .cactus_kernel: ; 62 lines atm
@@ -269,6 +269,30 @@ __skip_dino_in_sky:
   ; -----------------------------------------------
 
 DINO_SPRITE_1:
+;          /-8 bits-\
+;          |███████ |                 |███████ |      
+;         █|█ ██████|                X|█ ██████|       
+;         █|████████|                X|████████|       
+;         █|████████|                X|████████|       
+;         █|████████|                X|████████|       
+;         █|████    |                 |░████   | +1
+;         █|██████  |                 |░██████ | +1
+;  █     ██|███     |           X     |░░███   | +2
+;  █    ███|███     |             X   |░░░███  |  
+;  ██  ████|█████   |         ██  ████|█████   |    
+;  ████████|███ █   |         ████████|███ █   |    
+;  ████████|███     |         ████████|███     |  
+;   ███████|██      |          ███████|██      | 
+;    ██████|██      |           ██████|██      | 
+;     ███ █|█       |            ███ █|█       |
+;     ██   |█       |            ██   |█       |
+;     █    |█       |            █    |█       |
+;     ██   |██      |            ██   |██      | 
+;           76543210
+;
+
+
+  .ds 1
   .ds 1
   .byte %11000110
   .byte %11000110
@@ -307,43 +331,85 @@ DINO_SPRITE_1:
   .byte %11111110
   .ds 1
 
+DINO_SPRITE_OFFSET:
+;       LEFT  <---------------------------------------------------------> RIGHT
+;offset (px)  | -7  -6  -5  -4  -3  -2  -1  0  +1  +2  +3  +4  +5  +6  +7  +8
+;value in hex | 70  60  50  40  30  20  10 00  F0  E0  D0  C0  B0  A0  90  80
+  .ds 1
+   byte #$50 ; ██   ██             |██   ██ 
+   byte #$50 ; ██   ██             |██   ██ 
+   byte #$50 ; █    █              |█    █  
+   byte #$50 ; █    █              |█    █  
+   byte #$50 ; ██   █              |██   █  
+   byte #$50 ; ██   █              |██   █  
+   byte #$50 ; ███ ██              |███ ██  
+   byte #$50 ; ███ ██              |███ ██  
+   byte #$60 ; ████████            |████████
+   byte #$60 ; ████████            |████████
+   byte #$60 ; ████████            |████████
+   byte #$60 ; ████████            |████████
+   byte #$50 ; ████████            |████████
+   byte #$50 ; ████████            |████████
+   byte #$30 ; ██████ █            |██████ █
+   byte #$30 ; ██████ █            |██████ █
+   byte #$30 ; ████████            |████████
+   byte #$30 ; ████████            |████████
+   byte #$50 ;   ██████            |  ██████
+   byte #$50 ;   ██████            |  ██████
+   byte #$50 ;    █████            |   █████
+   byte #$50 ;    █████            |   █████
+   byte #$00 ; ███████            █|██████ 
+   byte #$00 ; ███████            █|██████ 
+   byte #$00 ; █████              █|████   
+   byte #$10 ; █████              █|████   
+   byte #$00 ; ████████            |████████
+   byte #$00 ; ████████            |████████
+   byte #$00 ; ████████            |████████
+   byte #$00 ; ████████            |████████
+   byte #$00 ; ████████            |████████
+   byte #$00 ; █ ██████            |█ ██████
+   byte #$00 ; █ ██████            |█ ██████
+   byte #$00 ; ███████             |███████ 
+   byte #$00 ; ███████             |███████ 
+  .ds 1
+
 DINO_MIS_OFFSET:
   .ds 1
-  .byte %11000110
-  .byte %11000110
-  .byte %10000100
-  .byte %10000100
-  .byte %11000100
-  .byte %11000100
-  .byte %11101100
-  .byte %11101100
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111101
-  .byte %11111101
-  .byte %11111111
-  .byte %11111111
-  .byte %00111111
-  .byte %00111111
-  .byte %00011111
-  .byte %00011111
-  .byte %11111110
-  .byte %11111110
-  .byte %11111000
-  .byte %11111000
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %11111111
-  .byte %10111111
-  .byte %10111111
-  .byte %11111110
-  .byte %11111110
+  .byte %11000110   ; ██...██.
+  .byte %11000110   ; ██...██.
+  .byte %10000100   ; █....█..
+  .byte %10000100   ; █....█..
+  .byte %11000100   ; ██...█..
+  .byte %11000100   ; ██...█..
+  .byte %11101100   ; ███.██..
+  .byte %11101100   ; ███.██..
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %11111101   ; ██████.█
+  .byte %11111101   ; ██████.█
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %00111111   ; ..██████
+  .byte %00111111   ; ..██████
+  .byte %00011111   ; ...█████
+  .byte %00011111   ; ...█████
+  .byte %11111110   ; ███████.
+  .byte %11111110   ; ███████.
+  .byte %11111000   ; █████...
+  .byte %11111000   ; █████...
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %11111111   ; ████████
+  .byte %10111111   ; █.██████
+  .byte %10111111   ; █.██████
+  .byte %11111110   ; ███████.
+  .byte %11111110   ; ███████.
   .ds 1
 ;=============================================================================
 ; ROM SETUP
