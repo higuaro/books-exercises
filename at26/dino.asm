@@ -345,27 +345,27 @@ DINO_SPRITE_OFFSET:
   .byte $00  ;  ▒▒   █     |  +5
   .byte $00  ;  ▒▒▒ ▒█     |  +5
   .byte $00  ;  ▒▒▒ ▒█     |  +5
+  .byte $F0  ;  ▒▒▒▒▒▒██   |  +6 <-- +1 offset
   .byte $00  ;  ▒▒▒▒▒▒██   |  +6
   .byte $00  ;  ▒▒▒▒▒▒██   |  +6
   .byte $00  ;  ▒▒▒▒▒▒██   |  +6
-  .byte $00  ;  ▒▒▒▒▒▒██   |  +6
+  .byte $10  ;  ▒▒▒▒▒███   |  +5
   .byte $00  ;  ▒▒▒▒▒███   |  +5
-  .byte $00  ;  ▒▒▒▒▒███   |  +5
-  .byte $00  ;  ▒▒▒███ █   |  +3
+  .byte $20  ;  ▒▒▒███ █   |  +3
   .byte $00  ;  ▒▒▒███ █   |  +3
   .byte $00  ;  ▒▒▒█████   |  +3
   .byte $00  ;  ▒▒▒█████   |  +3
   .byte $00  ;  ▒▒▒███     |  +3
   .byte $00  ;  ▒▒▒███     |  +3
+  .byte $10  ;  ▒▒███      |  +2
   .byte $00  ;  ▒▒███      |  +2
-  .byte $00  ;  ▒▒███      |  +2
-  .byte $10  ;  ▒██████    |  +1
-  .byte $00  ;  ▒██████    |  +1
+  .byte $10  ;  ▒██████    |  +1 <-- pixel offsets aggregate, thus this -1 is
+  .byte $00  ;  ▒██████    |  +1     added on top of the previous -1 offset
   .byte $00  ;  ▒████      |  +1
   .byte $00  ;  ▒████      |  +1
-  .byte $10  ;  ████████   |   0 <-- pixel offset has to be applied on the
-  .byte $00  ;  ████████   |   0     applied on the previous scanline so
-  .byte $00  ;  ████████   |   0     it takes effect on the next one
+  .byte $10  ;  ████████   |   0 <-- any pixel offset has to be applied on the
+  .byte $00  ;  ████████   |   0     previous scanline so it takes effect on
+  .byte $00  ;  ████████   |   0     the next scanline
   .byte $00  ;  ████████   |   0
   .byte $00  ;  ████████   |   0
   .byte $00  ;  ████████   |   0
