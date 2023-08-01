@@ -43,7 +43,7 @@ RND_MEM_LOC_2 = $e5   ; bytes when the machine starts. Hopefully this finds
                       ; some garbage values that can be used as seed
 
 BKG_LIGHT_GRAY = #13
-DINO_HEIGHT = #37
+DINO_HEIGHT = #39
 DINO_X = #5                 ; Fixed, the dino remains locked in its x position
 DINO_X_DIV_5 = DINO_X / #5   ; for the whole game
 
@@ -105,7 +105,7 @@ __clear_mem:
   lda #BKG_LIGHT_GRAY
   sta BG_COLOUR
 
-  LOAD_ADDRESS_TO_PTR DINO_SPRITE_1, PTR_DINO_SPRITE
+  LOAD_ADDRESS_TO_PTR DINO_SPRITE_DEAD, PTR_DINO_SPRITE
 
 ;=============================================================================
 ; FRAME
@@ -198,15 +198,16 @@ __dino_coarse_pos:
   sta WSYNC
 
 .sky_kernel:
-  txa  ; A <- current scanline (Y)            ; 2
-  sbc DINO_BOTTOM_Y ; dino bottom y + 1       ; 3
-  adc #DINO_HEIGHT+1                          ; 2
-  bcc __skip_dino_in_sky                      ; 2/3
-  tay                                         ; 2
-  lda (PTR_DINO_SPRITE),y                     ; 5+
-  sta GRP0                                    ; 3
-  lda DINO_SPRITE_OFFSET,y                    ; 4+
-  sta HMP0                                    ; 3
+  txa                         ; 2 - A <- current scanline (X) 
+  sec                         ; 2
+  sbc DINO_BOTTOM_Y           ; 3 - dino bottom y + 1
+  adc #DINO_HEIGHT+1          ; 2
+  bcc __skip_dino_in_sky      ; 2/3
+  tay                         ; 2
+  lda (PTR_DINO_SPRITE),y     ; 5+
+  sta GRP0                    ; 3
+  lda DINO_SPRITE_OFFSET,y    ; 4+
+  sta HMP0                    ; 3
 
 __skip_dino_in_sky:
   dex                                         ; 2
@@ -266,11 +267,6 @@ __skip_dino_in_sky:
   ;SEG data
   ;ORG $fe00
 
-  ; -----------------------------------------------
-  ; Graphics Data from PlayerPal 2600
-  ; https://alienbill.com/2600/playerpalnext.html
-  ; -----------------------------------------------
-
 DINO_SPRITE_1:
 ;          /-8 bits-\                          offset   sprite bits
 ;          |███████ |                 |███████ |  0      %11111110
@@ -293,7 +289,7 @@ DINO_SPRITE_1:
 ;     ██   |██      |            ..   |▒▒   ██ | +5      %11000110
 ;           76543210                   12345678
 ;
-  .ds 1
+  .ds 1              ; <------ clears GRP0 so the last row doesn't repeat
   .byte %11000110   ;  ▒▒   ██ 
   .byte %11000110   ;  ▒▒   ██ 
   .byte %10000100   ;  ▒    █  
@@ -330,7 +326,47 @@ DINO_SPRITE_1:
   .byte %10111111   ;  █ ██████
   .byte %11111110   ;  ███████ 
   .byte %11111110   ;  ███████ 
-  .ds 1
+  .ds 1              ; <------ clears GRP0 so the first row doesn't repeat
+
+DINO_SPRITE_DEAD:
+  .ds 1              ; <------ clears GRP0 so the last row doesn't repeat
+  .byte %11000110   ;  ▒▒   ██ 
+  .byte %11000110   ;  ▒▒   ██ 
+  .byte %10000100   ;  ▒    █  
+  .byte %10000100   ;  ▒    █  
+  .byte %11000100   ;  ▒▒   █  
+  .byte %11000100   ;  ▒▒   █  
+  .byte %11101100   ;  ▒▒▒ ▒█  
+  .byte %11101100   ;  ▒▒▒ ▒█  
+  .byte %11111111   ;  ▒▒▒▒▒▒██
+  .byte %11111111   ;  ▒▒▒▒▒▒██
+  .byte %11111111   ;  ▒▒▒▒▒▒██
+  .byte %11111111   ;  ▒▒▒▒▒▒██
+  .byte %11111111   ;  ▒▒▒▒▒███
+  .byte %11111111   ;  ▒▒▒▒▒███
+  .byte %11111101   ;  ▒▒▒███ █
+  .byte %11111101   ;  ▒▒▒███ █
+  .byte %11111111   ;  ▒▒▒█████
+  .byte %11111111   ;  ▒▒▒█████
+  .byte %11111100   ;  ▒▒▒███  
+  .byte %11111100   ;  ▒▒▒███  
+  .byte %11111000   ;  ▒▒███   
+  .byte %11111000   ;  ▒▒███   
+  .byte %11110000   ;  ▒███  
+  .byte %11110000   ;  ▒███  
+  .byte %11111110   ;  ▒██████ 
+  .byte %11111110   ;  ▒██████ 
+  .byte %11111111   ;  ████████
+  .byte %11111111   ;  ████████
+  .byte %11111111   ;  ████████
+  .byte %11111111   ;  ████████
+  .byte %11111111   ;  ████████
+  .byte %11111111   ;  ████████
+  .byte %10111111   ;  █ ██████
+  .byte %10111111   ;  █ ██████
+  .byte %11111110   ;  ███████ 
+  .byte %11111110   ;  ███████ 
+  .ds 1              ; <------ clears GRP0 so the first row doesn't repeat
 
 DINO_SPRITE_OFFSET:
 ;       LEFT  <---------------------------------------------------------> RIGHT
@@ -376,6 +412,27 @@ DINO_SPRITE_OFFSET:
   .ds 1
 
 DINO_MIS_OFFSET:
+;   876543210
+;  |        |███████ 
+;  |       █|█ ██████
+;  |       █|████████
+;  |       █|████████
+;  |       █|████████
+;  |       .|▒████   
+;  |       .|▒██████ 
+;  |█     ..|▒▒███   
+;  |█    ...|▒▒▒███  
+;  |██  █...|▒▒▒█████
+;  |█████...|▒▒▒███ █
+;  |████....|▒▒▒▒▒███
+;  | █......|▒▒▒▒▒▒██
+;  |  ......|▒▒▒▒▒▒██
+;  |   ... .|▒▒▒ ▒█  
+;  |   ..   |▒▒   █  
+;  |   .    |▒    █  
+;  |   ..   |▒▒   ██ 
+
+
   .ds 1
   .byte %11000110   ; ██...██.
   .byte %11000110   ; ██...██.
