@@ -29,6 +29,13 @@
     sta .POINTER+1
   ENDM
 
+  MAC INSERT_NOPS  ; insert n nops 
+.NUM_NOPS SET {1}
+    REPEAT .NUM_NOPS
+      nop
+    REPEND
+  ENDM
+
 ;=============================================================================
 ; SUBROUTINES
 ;=============================================================================
@@ -43,11 +50,10 @@ RND_MEM_LOC_2 = $e5   ; bytes when the machine starts. Hopefully this finds
                       ; some garbage values that can be used as seed
 
 BKG_LIGHT_GRAY = #13
-DINO_HEIGHT = #39
-DINO_X = #5                 ; Fixed, the dino remains locked in its x position
-DINO_X_DIV_5 = DINO_X / #5   ; for the whole game
+DINO_HEIGHT = #20
+DINO_POS_Y = #8
 
-SKY_KERNEL_LINES = #62
+SKY_KERNEL_LINES = #31
 CACTUS_KERNEL_LINES = #62
 
 ;=============================================================================
@@ -60,6 +66,8 @@ RND_SEED .word           ; 2 bytes
 DINO_BOTTOM_Y .byte      ; 3 bytes DINO_Y + DINO_HEIGHT
 BG_COLOUR .byte          ; 4 bytes
 PTR_DINO_SPRITE .word    ; 6 bytes
+PTR_DINO_OFFSET_1 .word  ; 8 bytes
+PTR_DINO_OFFSET_2 .word  ; 10 bytes
 
 ;=============================================================================
 ; ROM / GAME CODE
@@ -99,13 +107,35 @@ __clear_mem:
   ; -----------------------
   ; GAME INITIALIZATION
   ; -----------------------
-  lda #$10+#DINO_HEIGHT
+  lda #DINO_POS_Y+#DINO_HEIGHT
   sta DINO_BOTTOM_Y
 
   lda #BKG_LIGHT_GRAY
   sta BG_COLOUR
 
-  LOAD_ADDRESS_TO_PTR DINO_SPRITE_DEAD, PTR_DINO_SPRITE
+  ;LOAD_ADDRESS_TO_PTR DINO_SPRITE_1-#DINO_BOTTOM_Y, PTR_DINO_SPRITE
+  ;echo "spr addr: ",#DINO_SPRITE_1
+  ;echo "spr addr+1: ",#[DINO_SPRITE_1+1]
+  ;echo "spr addr []: ",#[DINO_SPRITE_1]
+  ;echo "spr addr+1 []: ",#[DINO_SPRITE_1+1]
+  echo "spr addr offsetted: ",#[DINO_SPRITE_1 - DINO_POS_Y]
+  echo "lb: ",<#[DINO_SPRITE_1 - DINO_POS_Y]
+  echo "ub: ",>#[DINO_SPRITE_1 - DINO_POS_Y]
+  lda #<[DINO_SPRITE_1 - DINO_POS_Y]
+  sta PTR_DINO_SPRITE
+  lda #>[DINO_SPRITE_1 - DINO_POS_Y]
+  sta PTR_DINO_SPRITE+1
+  ;LOAD_ADDRESS_TO_PTR DINO_SPRITE_DEAD, PTR_DINO_SPRITE
+
+  lda #<[DINO_SPRITE_OFFSET_1 - DINO_POS_Y]
+  sta PTR_DINO_OFFSET_1
+  lda #>[DINO_SPRITE_OFFSET_1 - DINO_POS_Y]
+  sta PTR_DINO_OFFSET_1+1
+
+  lda #<[DINO_SPRITE_OFFSET_2 - DINO_POS_Y]
+  sta PTR_DINO_OFFSET_2
+  lda #>[DINO_SPRITE_OFFSET_2 - DINO_POS_Y]
+  sta PTR_DINO_OFFSET_2+1
 
 ;=============================================================================
 ; FRAME
@@ -148,8 +178,6 @@ __vsync:
   sta COLUBK            ; Set initial background
   sta HMCLR             ; Clear horizontal motion registers
 
-  ;lda 
-
   lda #0
 __vblank:
   lda INTIM
@@ -180,43 +208,46 @@ kernel:
   lda BG_COLOUR    ; 3
   sta COLUBK       ; 3
 
-  ; Fix the dino_x position for the rest of the kernel
-  ldx #DINO_X_DIV_5
-__dino_coarse_pos:
-  dex
-  nop
-  nop
-  nop
-  bne __dino_coarse_pos
-  ; beam should be now at dino X (coarse dino x)
-  sta RESMP0 ; M0 will be 3 cycles (9 px) far from P0
-  sta RESP0
-  sta WSYNC
+  INSERT_NOPS 7    ; 14 Fix the dino_x position for the rest of the kernel
+                   ;    (notice I'm not starving for ROM atm of writing this)
+  sta RESMP0       ; 3  TV beam should now be at a dino coarse x position
+  sta RESP0        ; 3  M0 will be 3 cycles (9 px) far from P0
 
-  ldx #SKY_KERNEL_LINES    ; The sky is 62 scanlines
+  ldy #SKY_KERNEL_LINES    ; 3  The sky is 31 2x scanlines
+
   ; T0D0: set the coarse position of the cactus/pterodactile
-  sta WSYNC
+  sta WSYNC                ; 3
 
-.sky_kernel:
-  txa                         ; 2 - A <- current scanline (X) 
-  sec                         ; 2
-  sbc DINO_BOTTOM_Y           ; 3 - dino bottom y + 1
-  adc #DINO_HEIGHT+1          ; 2
-  bcc __skip_dino_in_sky      ; 2/3
-  tay                         ; 2
-  lda (PTR_DINO_SPRITE),y     ; 5+
-  sta GRP0                    ; 3
-  lda DINO_SPRITE_OFFSET,y    ; 4+
-  sta HMP0                    ; 3
+.sky_kernel:;----->>> 31 2x scanlines <<<-----
+  ; 1st scanline =============
+  tya                                   ; 2 - A = current scanline (Y)
+  sec                                   ; 2
+  sbc DINO_BOTTOM_Y                     ; 3 - A = X - DINO_BOTTOM_Y
+  adc #DINO_HEIGHT                      ; 2
+  bcc __y_not_within_dino               ; 2/3
+  lda (PTR_DINO_SPRITE),y               ; 5+
+  sta GRP0                              ; 3
+  lda (PTR_DINO_OFFSET_1),y             ; 5+
+  sta HMP0                              ; 3
 
-__skip_dino_in_sky:
-  dex                                         ; 2
-  sta WSYNC                                   ; 3
-  sta HMOVE                                   ; 3
-  bne .sky_kernel                             ; 2/3
+__y_not_within_dino:
 
-  ldx #SKY_KERNEL_LINES  ; 62 lines atm
-.cactus_kernel: ; 62 lines atm
+  sta WSYNC                             ; 3
+  sta HMOVE                             ; 3
+
+  ; 2nd scanline =============
+  INSERT_NOPS 10                        ; 24
+  lda (PTR_DINO_OFFSET_2),y             ; 5+
+  sta HMP0                              ; 3
+
+  sta WSYNC                             ; 3
+  sta HMOVE                             ; 3
+
+  dey                                   ; 2
+  bne .sky_kernel                       ; 2/3
+
+  ;ldx #SKY_KERNEL_LINES  ; 31 2x scan-lines atm
+.cactus_kernel:; ----->>> 31 2x scanlines <<<-----
   DEBUG_SUB_KERNEL #$90, #62
   ; txa  ; A <- current scanline (Y)
   ; sbc DINO_BOTTOM_Y ; dino bottom y + 1
@@ -289,187 +320,147 @@ DINO_SPRITE_1:
 ;     ██   |██      |            ..   |▒▒   ██ | +5      %11000110
 ;           76543210                   12345678
 ;
-  .ds 1              ; <------ clears GRP0 so the last row doesn't repeat
-  .byte %11000110   ;  ▒▒   ██ 
-  .byte %11000110   ;  ▒▒   ██ 
-  .byte %10000100   ;  ▒    █  
-  .byte %10000100   ;  ▒    █  
-  .byte %11000100   ;  ▒▒   █  
-  .byte %11000100   ;  ▒▒   █  
-  .byte %11101100   ;  ▒▒▒ ▒█  
-  .byte %11101100   ;  ▒▒▒ ▒█  
-  .byte %11111111   ;  ▒▒▒▒▒▒██
-  .byte %11111111   ;  ▒▒▒▒▒▒██
+  .ds 1             ; <------ clears GRP0 so the last row doesn't repeat
+  .byte %11000110   ;  ▒▒   ██
+  .byte %10000100   ;  ▒    █
+  .byte %11000100   ;  ▒▒   █
+  .byte %11101100   ;  ▒▒▒ ▒█
   .byte %11111111   ;  ▒▒▒▒▒▒██
   .byte %11111111   ;  ▒▒▒▒▒▒██
   .byte %11111111   ;  ▒▒▒▒▒███
-  .byte %11111111   ;  ▒▒▒▒▒███
-  .byte %11111101   ;  ▒▒▒███ █
   .byte %11111101   ;  ▒▒▒███ █
   .byte %11111111   ;  ▒▒▒█████
-  .byte %11111111   ;  ▒▒▒█████
-  .byte %11111100   ;  ▒▒▒███  
-  .byte %11111100   ;  ▒▒▒███  
-  .byte %11111000   ;  ▒▒███   
-  .byte %11111000   ;  ▒▒███   
-  .byte %11111110   ;  ▒██████ 
-  .byte %11111110   ;  ▒██████ 
-  .byte %11111000   ;  ▒████   
-  .byte %11111000   ;  ▒████   
-  .byte %11111111   ;  ████████
-  .byte %11111111   ;  ████████
-  .byte %11111111   ;  ████████
+  .byte %11111100   ;  ▒▒▒███
+  .byte %11111000   ;  ▒▒███
+  .byte %11111110   ;  ▒██████
+  .byte %11111000   ;  ▒████
   .byte %11111111   ;  ████████
   .byte %11111111   ;  ████████
   .byte %11111111   ;  ████████
   .byte %10111111   ;  █ ██████
-  .byte %10111111   ;  █ ██████
-  .byte %11111110   ;  ███████ 
-  .byte %11111110   ;  ███████ 
-  .ds 1              ; <------ clears GRP0 so the first row doesn't repeat
+  .byte %11111110   ;  ███████
+  .ds 1             ; <- this is to match the size of the pixel offsets table
+DINO_SPRITE_1_END = * ; * means 'here' or 'this'
 
 DINO_SPRITE_DEAD:
-  .ds 1              ; <------ clears GRP0 so the last row doesn't repeat
-  .byte %11000110   ;  ▒▒   ██ 
-  .byte %11000110   ;  ▒▒   ██ 
-  .byte %10000100   ;  ▒    █  
-  .byte %10000100   ;  ▒    █  
-  .byte %11000100   ;  ▒▒   █  
-  .byte %11000100   ;  ▒▒   █  
-  .byte %11101100   ;  ▒▒▒ ▒█  
-  .byte %11101100   ;  ▒▒▒ ▒█  
-  .byte %11111111   ;  ▒▒▒▒▒▒██
-  .byte %11111111   ;  ▒▒▒▒▒▒██
+  .ds 1             ;
+  .byte %11000110   ;  ▒▒   ██
+  .byte %10000100   ;  ▒    █
+  .byte %11000100   ;  ▒▒   █
+  .byte %11101100   ;  ▒▒▒ ▒█
   .byte %11111111   ;  ▒▒▒▒▒▒██
   .byte %11111111   ;  ▒▒▒▒▒▒██
   .byte %11111111   ;  ▒▒▒▒▒███
-  .byte %11111111   ;  ▒▒▒▒▒███
-  .byte %11111101   ;  ▒▒▒███ █
   .byte %11111101   ;  ▒▒▒███ █
   .byte %11111111   ;  ▒▒▒█████
-  .byte %11111111   ;  ▒▒▒█████
-  .byte %11111100   ;  ▒▒▒███  
-  .byte %11111100   ;  ▒▒▒███  
-  .byte %11111000   ;  ▒▒███   
-  .byte %11111000   ;  ▒▒███   
-  .byte %11110000   ;  ▒███  
-  .byte %11110000   ;  ▒███  
-  .byte %11111110   ;  ▒██████ 
-  .byte %11111110   ;  ▒██████ 
-  .byte %11111111   ;  ████████
-  .byte %11111111   ;  ████████
-  .byte %11111111   ;  ████████
-  .byte %11111111   ;  ████████
+  .byte %11111100   ;  ▒▒▒███
+  .byte %11111000   ;  ▒▒███
+  .byte %11110000   ;  ▒███
+  .byte %11111110   ;  ▒██████
   .byte %11111111   ;  ████████
   .byte %11111111   ;  ████████
   .byte %10111111   ;  █ ██████
-  .byte %10111111   ;  █ ██████
-  .byte %11111110   ;  ███████ 
-  .byte %11111110   ;  ███████ 
-  .ds 1              ; <------ clears GRP0 so the first row doesn't repeat
+  .byte %01011111   ;   █ █████
+  .byte %10111110   ;  █ █████
+  .ds 1
 
-DINO_SPRITE_OFFSET:
+DINO_SPRITE_OFFSET_1:
 ;       LEFT  <---------------------------------------------------------> RIGHT
 ;offset (px)  | -7  -6  -5  -4  -3  -2  -1  0  +1  +2  +3  +4  +5  +6  +7  +8
 ;value in hex | 70  60  50  40  30  20  10 00  F0  E0  D0  C0  B0  A0  90  80
   .ds 1
-  .byte $00  ;  ▒▒   ██    |  +5
-  .byte $00  ;  ▒▒   ██    |  +5
-  .byte $00  ;  ▒    █     |  +5
-  .byte $00  ;  ▒    █     |  +5
-  .byte $00  ;  ▒▒   █     |  +5
-  .byte $00  ;  ▒▒   █     |  +5
-  .byte $00  ;  ▒▒▒ ▒█     |  +5
-  .byte $00  ;  ▒▒▒ ▒█     |  +5
-  .byte $F0  ;  ▒▒▒▒▒▒██   |  +6 <-- +1 offset
-  .byte $00  ;  ▒▒▒▒▒▒██   |  +6
-  .byte $00  ;  ▒▒▒▒▒▒██   |  +6
-  .byte $00  ;  ▒▒▒▒▒▒██   |  +6
-  .byte $10  ;  ▒▒▒▒▒███   |  +5
-  .byte $00  ;  ▒▒▒▒▒███   |  +5
-  .byte $20  ;  ▒▒▒███ █   |  +3
-  .byte $00  ;  ▒▒▒███ █   |  +3
-  .byte $00  ;  ▒▒▒█████   |  +3
-  .byte $00  ;  ▒▒▒█████   |  +3
-  .byte $00  ;  ▒▒▒███     |  +3
-  .byte $00  ;  ▒▒▒███     |  +3
-  .byte $10  ;  ▒▒███      |  +2
-  .byte $00  ;  ▒▒███      |  +2
-  .byte $10  ;  ▒██████    |  +1 <-- pixel offsets aggregate, thus this -1 is
-  .byte $00  ;  ▒██████    |  +1     added on top of the previous -1 offset
-  .byte $00  ;  ▒████      |  +1
-  .byte $00  ;  ▒████      |  +1
-  .byte $10  ;  ████████   |   0 <-- any pixel offset has to be applied on the
+  .byte $00  ;  ▒▒   ██    |  -5
+  .byte $00  ;  ▒    █     |  -5
+  .byte $00  ;  ▒▒   █     |  -5
+  .byte $00  ;  ▒▒▒ ▒█     |  -5
+  .byte $00  ;  ▒▒▒▒▒▒██   |  -6
+  .byte $00  ;  ▒▒▒▒▒▒██   |  -6
+  .byte $00  ;  ▒▒▒▒▒███   |  -5
+  .byte $00  ;  ▒▒▒███ █   |  -3
+  .byte $00  ;  ▒▒▒█████   |  -3
+  .byte $00  ;  ▒▒▒███     |  -3
+  .byte $00  ;  ▒▒███      |  -2
+  .byte $00  ;  ▒██████    |  -1
+  .byte $00  ;  ▒████      |  -1
+  .byte $00  ;  ████████   |   0 <-- Any pixel offset has to be applied on the
   .byte $00  ;  ████████   |   0     previous scanline so it takes effect on
-  .byte $00  ;  ████████   |   0     the next scanline
-  .byte $00  ;  ████████   |   0
-  .byte $00  ;  ████████   |   0
-  .byte $00  ;  ████████   |   0
-  .byte $00  ;  █ ██████   |   0
-  .byte $00  ;  █ ██████   |   0
+  .byte $00  ;  ████████   |   0     the next scanline, then it remains for the
+  .byte $00  ;  █ ██████   |   0     next scanlines
   .byte $00  ;  ███████    |   0
-  .byte $00  ;  ███████    |   0
-  .ds 1
+  .ds 1      ; <- this resets the HMP0 register back to 0
 
+DINO_SPRITE_OFFSET_2:
+;       LEFT  <---------------------------------------------------------> RIGHT
+;offset (px)  | -7  -6  -5  -4  -3  -2  -1  0  +1  +2  +3  +4  +5  +6  +7  +8
+;value in hex | 70  60  50  40  30  20  10 00  F0  E0  D0  C0  B0  A0  90  80
+  .ds 1
+  .byte $00  ;  ▒▒   ██    |  -5
+  .byte $00  ;  ▒    █     |  -5
+  .byte $00  ;  ▒▒   █     |  -5
+  .byte $00  ;  ▒▒▒ ▒█     |  -5
+  .byte $F0  ;  ▒▒▒▒▒▒██   |  -6
+  .byte $00  ;  ▒▒▒▒▒▒██   |  -6
+  .byte $10  ;  ▒▒▒▒▒███   |  -5
+  .byte $20  ;  ▒▒▒███ █   |  -3
+  .byte $00  ;  ▒▒▒█████   |  -3
+  .byte $00  ;  ▒▒▒███     |  -3
+  .byte $10  ;  ▒▒███      |  -2
+  .byte $10  ;  ▒██████    |  -1
+  .byte $00  ;  ▒████      |  -1
+  .byte $10  ;  ████████   |   0
+  .byte $00  ;  ████████   |   0
+  .byte $00  ;  ████████   |   0
+  .byte $00  ;  █ ██████   |   0
+  .byte $00  ;  ███████    |   0
+  .ds 1      ; <- this resets the HMP0 register back to 0
 DINO_MIS_OFFSET:
-;   876543210
-;  |        |███████ 
-;  |       █|█ ██████
-;  |       █|████████
-;  |       █|████████
-;  |       █|████████
-;  |       .|▒████   
-;  |       .|▒██████ 
-;  |█     ..|▒▒███   
-;  |█    ...|▒▒▒███  
-;  |██  █...|▒▒▒█████
-;  |█████...|▒▒▒███ █
-;  |████....|▒▒▒▒▒███
-;  | █......|▒▒▒▒▒▒██
-;  |  ......|▒▒▒▒▒▒██
-;  |   ... .|▒▒▒ ▒█  
-;  |   ..   |▒▒   █  
-;  |   .    |▒    █  
-;  |   ..   |▒▒   ██ 
-
+;
+; M0 is strobed at a moment T
+;   |         +--- then GRP0 is strobed at T+3 CPU cycles (9 pixels) after M0
+;   |         |
+;   v         v                                      missile offset and size
+;  |         |███████          |         |███████           0  0
+;  |█        |█ ██████         |        █|█ ██████         +8  1
+;  |█        |████████         |        █|████████         +8  1
+;  |█        |████████         |        █|████████         +8  1
+;  |█        |████████         |        █|████████         +8  1
+;  |        ▒|████             |        ▒|████              0  0
+;  |    ?   ▒|██████           |        ▒|██████            0  0
+;  |█   |  ▒▒|███              | █     ▒▒|███              +1  1
+;  |█   v ▒▒▒|███              | █    ▒▒▒|███              +1  1
+;  |██  █ ▒▒▒|█████            | ██  █▒▒▒|█████            +1  2 (repeat?)
+;  |█████ ▒▒▒|███ █            | █████▒▒▒|███ █            +1  8
+;  |████▒▒▒▒▒|███              | ███X▒▒▒▒|███              +1  4 or rmore
+;  | █ ▒▒▒▒▒▒|██               |  █▒▒▒▒▒▒|██               +1  1 or more
+;  |   ▒▒▒▒▒▒|██               |   ▒▒▒▒▒▒|██                0  0
+;  |    ▒▒▒ ▒|█                |    ▒▒▒ ▒|█                 0  0
+;  |    ▒▒   |█                |    ▒▒   |█                 0  0
+;  |    ▒    |█                |    ▒    |█                 0  0
+;  |    ▒▒   |██               |    ▒▒   |██                0  0
+;  |-- 9 px -|                 |-- 9 px -|
+;   012345678                   012345678       X means overlapping pixel
 
   .ds 1
-  .byte %11000110   ; ██...██.
-  .byte %11000110   ; ██...██.
-  .byte %10000100   ; █....█..
-  .byte %10000100   ; █....█..
-  .byte %11000100   ; ██...█..
-  .byte %11000100   ; ██...█..
-  .byte %11101100   ; ███.██..
-  .byte %11101100   ; ███.██..
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %11111101   ; ██████.█
-  .byte %11111101   ; ██████.█
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %00111111   ; ..██████
-  .byte %00111111   ; ..██████
-  .byte %00011111   ; ...█████
-  .byte %00011111   ; ...█████
-  .byte %11111110   ; ███████.
-  .byte %11111110   ; ███████.
-  .byte %11111000   ; █████...
-  .byte %11111000   ; █████...
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %11111111   ; ████████
-  .byte %10111111   ; █.██████
-  .byte %10111111   ; █.██████
-  .byte %11111110   ; ███████.
-  .byte %11111110   ; ███████.
+  .byte 0 ; |    ▒▒   |██           0  0
+  .byte 0 ; |    ▒    |█            0  0
+  .byte 0 ; |    ▒▒   |█            0  0
+  .byte 0 ; |    ▒▒▒ ▒|█            0  0
+  .byte 0 ; |   ▒▒▒▒▒▒|██           0  0
+  .byte 0 ; |  █▒▒▒▒▒▒|██          +1  1 or more
+  .byte 0 ; | ███X▒▒▒▒|███         +1  4 or rmore
+  .byte 0 ; | █████▒▒▒|███ █       +1  8
+  .byte 0 ; | ██  █▒▒▒|█████       +1  2 (repeat?)
+  .byte 0 ; | █    ▒▒▒|███         +1  1
+  .byte 0 ; | █     ▒▒|███         +1  1
+  .byte 0 ; |        ▒|██████       0  0
+  .byte 0 ; |        ▒|████         0  0
+  .byte 0 ; |        █|████████    +8  1
+  .byte 0 ; |        █|████████    +8  1
+  .byte 0 ; |        █|████████    +8  1
+  .byte 0 ; |        █|█ ██████    +8  1
+  .byte 0 ; |         |███████      0  0
   .ds 1
+
 ;=============================================================================
 ; ROM SETUP
 ;=============================================================================
