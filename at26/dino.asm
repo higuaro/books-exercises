@@ -66,8 +66,8 @@ RND_SEED .word           ; 2 bytes
 DINO_BOTTOM_Y .byte      ; 3 bytes DINO_Y + DINO_HEIGHT
 BG_COLOUR .byte          ; 4 bytes
 PTR_DINO_SPRITE .word    ; 6 bytes
-PTR_DINO_OFFSET_1 .word  ; 8 bytes
-PTR_DINO_OFFSET_2 .word  ; 10 bytes
+PTR_DINO_OFFSET .word  ; 8 bytes
+PTR_DINO_MIS .word  ; 10 bytes
 
 ;=============================================================================
 ; ROM / GAME CODE
@@ -113,29 +113,20 @@ __clear_mem:
   lda #BKG_LIGHT_GRAY
   sta BG_COLOUR
 
-  ;LOAD_ADDRESS_TO_PTR DINO_SPRITE_1-#DINO_BOTTOM_Y, PTR_DINO_SPRITE
-  ;echo "spr addr: ",#DINO_SPRITE_1
-  ;echo "spr addr+1: ",#[DINO_SPRITE_1+1]
-  ;echo "spr addr []: ",#[DINO_SPRITE_1]
-  ;echo "spr addr+1 []: ",#[DINO_SPRITE_1+1]
-  echo "spr addr offsetted: ",#[DINO_SPRITE_1 - DINO_POS_Y]
-  echo "lb: ",<#[DINO_SPRITE_1 - DINO_POS_Y]
-  echo "ub: ",>#[DINO_SPRITE_1 - DINO_POS_Y]
   lda #<[DINO_SPRITE_1 - DINO_POS_Y]
   sta PTR_DINO_SPRITE
   lda #>[DINO_SPRITE_1 - DINO_POS_Y]
   sta PTR_DINO_SPRITE+1
-  ;LOAD_ADDRESS_TO_PTR DINO_SPRITE_DEAD, PTR_DINO_SPRITE
 
-  lda #<[DINO_SPRITE_OFFSET_1 - DINO_POS_Y]
-  sta PTR_DINO_OFFSET_1
-  lda #>[DINO_SPRITE_OFFSET_1 - DINO_POS_Y]
-  sta PTR_DINO_OFFSET_1+1
+  lda #<[DINO_SPRITE_OFFSET - DINO_POS_Y]
+  sta PTR_DINO_OFFSET
+  lda #>[DINO_SPRITE_OFFSET - DINO_POS_Y]
+  sta PTR_DINO_OFFSET+1
 
-  lda #<[DINO_SPRITE_OFFSET_2 - DINO_POS_Y]
-  sta PTR_DINO_OFFSET_2
-  lda #>[DINO_SPRITE_OFFSET_2 - DINO_POS_Y]
-  sta PTR_DINO_OFFSET_2+1
+  lda #<[DINO_SPRITE_OFFSET - DINO_POS_Y]
+  sta PTR_DINO_MIS
+  lda #>[DINO_SPRITE_OFFSET - DINO_POS_Y]
+  sta PTR_DINO_MIS+1
 
 ;=============================================================================
 ; FRAME
@@ -227,7 +218,9 @@ kernel:
   bcc __y_not_within_dino               ; 2/3
   lda (PTR_DINO_SPRITE),y               ; 5+
   sta GRP0                              ; 3
-  lda (PTR_DINO_OFFSET_1),y             ; 5+
+  lda (PTR_DINO_MIS),y                  ; 5+
+
+  lda #0                                ; 2
   sta HMP0                              ; 3
 
 __y_not_within_dino:
@@ -237,7 +230,7 @@ __y_not_within_dino:
 
   ; 2nd scanline =============
   INSERT_NOPS 10                        ; 24
-  lda (PTR_DINO_OFFSET_2),y             ; 5+
+  lda (PTR_DINO_OFFSET),y             ; 5+
   sta HMP0                              ; 3
 
   sta WSYNC                             ; 3
@@ -364,32 +357,7 @@ DINO_SPRITE_DEAD:
   .byte %10111110   ;  █ █████
   .ds 1
 
-DINO_SPRITE_OFFSET_1:
-;       LEFT  <---------------------------------------------------------> RIGHT
-;offset (px)  | -7  -6  -5  -4  -3  -2  -1  0  +1  +2  +3  +4  +5  +6  +7  +8
-;value in hex | 70  60  50  40  30  20  10 00  F0  E0  D0  C0  B0  A0  90  80
-  .ds 1
-  .byte $00  ;  ▒▒   ██    |  -5
-  .byte $00  ;  ▒    █     |  -5
-  .byte $00  ;  ▒▒   █     |  -5
-  .byte $00  ;  ▒▒▒ ▒█     |  -5
-  .byte $00  ;  ▒▒▒▒▒▒██   |  -6
-  .byte $00  ;  ▒▒▒▒▒▒██   |  -6
-  .byte $00  ;  ▒▒▒▒▒███   |  -5
-  .byte $00  ;  ▒▒▒███ █   |  -3
-  .byte $00  ;  ▒▒▒█████   |  -3
-  .byte $00  ;  ▒▒▒███     |  -3
-  .byte $00  ;  ▒▒███      |  -2
-  .byte $00  ;  ▒██████    |  -1
-  .byte $00  ;  ▒████      |  -1
-  .byte $00  ;  ████████   |   0 <-- Any pixel offset has to be applied on the
-  .byte $00  ;  ████████   |   0     previous scanline so it takes effect on
-  .byte $00  ;  ████████   |   0     the next scanline, then it remains for the
-  .byte $00  ;  █ ██████   |   0     next scanlines
-  .byte $00  ;  ███████    |   0
-  .ds 1      ; <- this resets the HMP0 register back to 0
-
-DINO_SPRITE_OFFSET_2:
+DINO_SPRITE_OFFSET:
 ;       LEFT  <---------------------------------------------------------> RIGHT
 ;offset (px)  | -7  -6  -5  -4  -3  -2  -1  0  +1  +2  +3  +4  +5  +6  +7  +8
 ;value in hex | 70  60  50  40  30  20  10 00  F0  E0  D0  C0  B0  A0  90  80
@@ -407,10 +375,10 @@ DINO_SPRITE_OFFSET_2:
   .byte $10  ;  ▒▒███      |  -2
   .byte $10  ;  ▒██████    |  -1
   .byte $00  ;  ▒████      |  -1
-  .byte $10  ;  ████████   |   0
-  .byte $00  ;  ████████   |   0
-  .byte $00  ;  ████████   |   0
-  .byte $00  ;  █ ██████   |   0
+  .byte $10  ;  ████████   |   0 <-- Any pixel offset has to be applied on the
+  .byte $00  ;  ████████   |   0     previous scanline so it takes effect on
+  .byte $00  ;  ████████   |   0     the next scanline, then it remains for the
+  .byte $00  ;  █ ██████   |   0     next scanlines
   .byte $00  ;  ███████    |   0
   .ds 1      ; <- this resets the HMP0 register back to 0
 DINO_MIS_OFFSET:
@@ -440,25 +408,25 @@ DINO_MIS_OFFSET:
 ;  |-- 9 px -|                 |-- 9 px -|
 ;   012345678                   012345678       X means overlapping pixel
 
-  .ds 1
-  .byte 0 ; |    ▒▒   |██           0  0
-  .byte 0 ; |    ▒    |█            0  0
-  .byte 0 ; |    ▒▒   |█            0  0
-  .byte 0 ; |    ▒▒▒ ▒|█            0  0
-  .byte 0 ; |   ▒▒▒▒▒▒|██           0  0
-  .byte 0 ; |  █▒▒▒▒▒▒|██          +1  1 or more
-  .byte 0 ; | ███X▒▒▒▒|███         +1  4 or rmore
-  .byte 0 ; | █████▒▒▒|███ █       +1  8
-  .byte 0 ; | ██  █▒▒▒|█████       +1  2 (repeat?)
-  .byte 0 ; | █    ▒▒▒|███         +1  1
-  .byte 0 ; | █     ▒▒|███         +1  1
-  .byte 0 ; |        ▒|██████       0  0
-  .byte 0 ; |        ▒|████         0  0
-  .byte 0 ; |        █|████████    +8  1
-  .byte 0 ; |        █|████████    +8  1
-  .byte 0 ; |        █|████████    +8  1
-  .byte 0 ; |        █|█ ██████    +8  1
-  .byte 0 ; |         |███████      0  0
+  .ds 1     ;  012345678         offset & size
+  .byte %00 ; |    ▒▒   |██           0  0
+  .byte %00 ; |    ▒    |█            0  0
+  .byte %00 ; |    ▒▒   |█            0  0
+  .byte %00 ; |    ▒▒▒ ▒|█            0  0
+  .byte %00 ; |   ▒▒▒▒▒▒|██           0  0
+  .byte %10 ; |  █▒▒▒▒▒▒|██          +1  1 or more
+  .byte %10 ; | ███X▒▒▒▒|███         +1  4 or rmore
+  .byte %10 ; | █████▒▒▒|███ █       +1  8
+  .byte %10 ; | ██  █▒▒▒|█████       +1  2 (repeat?)
+  .byte %10 ; | █   ^▒▒▒|███         +1  1
+  .byte %10 ; | █   | ▒▒|███         +1  1
+  .byte %00 ; |     ?  ▒|██████       0  0
+  .byte %00 ; |        ▒|████         0  0
+  .byte %10 ; |        █|████████    +8  1
+  .byte %10 ; |        █|████████    +8  1
+  .byte %10 ; |        █|████████    +8  1
+  .byte %10 ; |        █|█ ██████    +8  1
+  .byte %00 ; |         |███████      0  0
   .ds 1
 
 ;=============================================================================
