@@ -11,9 +11,10 @@
     REPEND
   ENDM
 
-  org $80
   seg.u variables
-;SECONDS ds 1
+  org $80
+SECONDS .byte
+NUSIZE .byte
 
   seg code
   org $f000
@@ -42,6 +43,27 @@ __vsync_and_vblank:
   sta WSYNC
   sta VSYNC
 
+  inc SECONDS
+  lda SECONDS
+  lda #100
+  cmp SECONDS
+  bne skip_wrap_around
+  lda #0
+  sta SECONDS
+skip_wrap_around:
+
+  lda #5
+  cmp SECONDS
+  bne skip_inc_nusize
+  inc NUSIZE
+skip_inc_nusize:
+
+  lda #79
+  sta COLUBK
+  lda #19
+  sta COLUP0
+  sta HMCLR
+
 ; 37 lines of vblank
   lda #43
   sta TIM64T
@@ -51,11 +73,6 @@ __timer_vblank:
   sta WSYNC
   sta VBLANK
 
-  lda #79
-  sta COLUBK
-  lda #19
-  sta COLUP0
-  sta HMCLR
 
   ldx #5
 set_mis_pos:
@@ -69,7 +86,7 @@ set_mis_pos:
   ldy #192
   sta WSYNC
   sta HMOVE
-  lda #%00000000
+  lda NUSIZE
   sta NUSIZ0
 
 frame:
