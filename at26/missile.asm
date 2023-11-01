@@ -86,7 +86,11 @@ set_mis_pos:
   ldy #192
   sta WSYNC
   sta HMOVE
+<<<<<<< Updated upstream
   lda NUSIZE
+=======
+  lda #%00000010
+>>>>>>> Stashed changes
   sta NUSIZ0
 
 frame:

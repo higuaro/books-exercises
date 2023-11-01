@@ -123,9 +123,9 @@ __clear_mem:
   lda #>[DINO_SPRITE_OFFSET - DINO_POS_Y]
   sta PTR_DINO_OFFSET+1
 
-  lda #<[DINO_SPRITE_OFFSET - DINO_POS_Y]
+  lda #<[DINO_MIS_OFFSET - DINO_POS_Y]
   sta PTR_DINO_MIS
-  lda #>[DINO_SPRITE_OFFSET - DINO_POS_Y]
+  lda #>[DINO_MIS_OFFSET - DINO_POS_Y]
   sta PTR_DINO_MIS+1
 
 ;=============================================================================
@@ -219,6 +219,7 @@ kernel:
   lda (PTR_DINO_SPRITE),y               ; 5+
   sta GRP0                              ; 3
   lda (PTR_DINO_MIS),y                  ; 5+
+
 
   lda #0                                ; 2
   sta HMP0                              ; 3
