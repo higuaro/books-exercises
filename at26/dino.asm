@@ -201,7 +201,7 @@ kernel:
 
   INSERT_NOPS 7    ; 14 Fix the dino_x position for the rest of the kernel
                    ;    (notice I'm not starving for ROM atm of writing this)
-  sta RESMP0       ; 3  TV beam should now be at a dino coarse x position
+  sta RESM0        ; 3  TV beam should now be at a dino coarse x position
   sta RESP0        ; 3  M0 will be 3 cycles (9 px) far from P0
 
   ldy #SKY_KERNEL_LINES    ; 3  The sky is 31 2x scanlines
@@ -218,9 +218,9 @@ kernel:
   bcc __y_not_within_dino               ; 2/3
   lda (PTR_DINO_SPRITE),y               ; 5+
   sta GRP0                              ; 3
-  lda #2 
-  sta ENAM0
+  ;lda #2 
   lda (PTR_DINO_MIS),y                  ; 5+
+  sta ENAM0
   asl
   asl
   and %00011000
@@ -415,53 +415,80 @@ DINO_MIS_OFFSET:
 ;  |-- 9 px -|                 |-- 9 px -|
 ;   012345678                   012345678       X means overlapping pixel
 
-                  ; offset in px      missile   missile
+;  .ds 1           ;  012345678         offset    size (NUSIZE bits 5,4)
+;  .byte %00       ; |    ▒▒   |██         0        0
+;  .byte %00       ; |    ▒    |█          0        0
+;  .byte %00       ; |    ▒▒   |█          0        0
+;  .byte %00       ; |    ▒▒▒ ▒|█          0        0
+;  .byte %00       ; |   ▒▒▒▒▒▒|██         0        0
+;  .byte %11100110 ; |  █▒▒▒▒▒▒|██        +2        1 or more
+;  .byte %11111010 ; | ███X▒▒▒▒|███       +1        4 or rmore
+;  .byte %11111110 ; | █████▒▒▒|███ █     +1        8
+;  .byte %11110110 ; | ██  █▒▒▒|█████     +1        2
+;  .byte %11110010 ; | █   ^▒▒▒|███       +1        1
+;  .byte %11110010 ; | █   | ▒▒|███       +1        1
+;  .byte %00       ; |     ?  ▒|██████     0        0
+;  .byte %00       ; |        ▒|████       0        0
+;  .byte %10000010 ; |        █|████████  +8        1
+;  .byte %10000010 ; |        █|████████  +8        1
+;  .byte %10000010 ; |        █|████████  +8        1
+;  .byte %10000010 ; |        █|█ ██████  +8        1
+;  .byte %00       ; |         |███████    0        0
+;  .ds 1           ; |         |  
+;                   |         | ^ █ sprite pixels (GRP0)
+;                       ^ 
+;               █ missile pixels and 
+;               ▒ shifted sprite pixels (GRP0 after HMOVE)
   .ds 1           ;  012345678         offset    size (NUSIZE bits 5,4)
   .byte %00       ; |    ▒▒   |██         0        0
   .byte %00       ; |    ▒    |█          0        0
   .byte %00       ; |    ▒▒   |█          0        0
   .byte %00       ; |    ▒▒▒ ▒|█          0        0
   .byte %00       ; |   ▒▒▒▒▒▒|██         0        0
-  .byte %11100000 ; |  █▒▒▒▒▒▒|██        +2        1 or more
-  .byte %11110000 ; | ███X▒▒▒▒|███       +1        4 or rmore
-  .byte %11110000 ; | █████▒▒▒|███ █     +1        8
-  .byte %11110000 ; | ██  █▒▒▒|█████     +1        2
-  .byte %11110000 ; | █   ^▒▒▒|███       +1        1
-  .byte %11110000 ; | █   | ▒▒|███       +1        1
+  .byte %11100010 ; |  █▒▒▒▒▒▒|██        +2        1 or more
+  .byte %11110010 ; | ███X▒▒▒▒|███       +1        4 or rmore
+  .byte %11110010 ; | █████▒▒▒|███ █     +1        8
+  .byte %11110010 ; | ██  █▒▒▒|█████     +1        2
+  .byte %11110010 ; | █   ^▒▒▒|███       +1        1
+  .byte %11110010 ; | █   | ▒▒|███       +1        1
   .byte %00       ; |     ?  ▒|██████     0        0
   .byte %00       ; |        ▒|████       0        0
-  .byte %10000000 ; |        █|████████  +8        1
-  .byte %10000000 ; |        █|████████  +8        1
-  .byte %10000000 ; |        █|████████  +8        1
-  .byte %10000000 ; |        █|█ ██████  +8        1
+  .byte %10000010 ; |        █|████████  +8        1
+  .byte %10000010 ; |        █|████████  +8        1
+  .byte %10000010 ; |        █|████████  +8        1
+  .byte %10000010 ; |        █|█ ██████  +8        1
   .byte %00       ; |         |███████    0        0
   .ds 1           ; |         |  
-
-; .ds 1           ;  012345678         offset    size (NUSIZE bits 5,4)
-; .byte %00       ; |    ▒▒   |██         0        0
-; .byte %00       ; |    ▒    |█          0        0
-; .byte %00       ; |    ▒▒   |█          0        0
-; .byte %00       ; |    ▒▒▒ ▒|█          0        0
-; .byte %00       ; |   ▒▒▒▒▒▒|██         0        0
-; .byte %11100110 ; |  █▒▒▒▒▒▒|██        +2        1 or more
-; .byte %11111010 ; | ███X▒▒▒▒|███       +1        4 or rmore
-; .byte %11111110 ; | █████▒▒▒|███ █     +1        8
-; .byte %11110110 ; | ██  █▒▒▒|█████     +1        2
-; .byte %11110010 ; | █   ^▒▒▒|███       +1        1
-; .byte %11110010 ; | █   | ▒▒|███       +1        1
-; .byte %00       ; |     ?  ▒|██████     0        0
-; .byte %00       ; |        ▒|████       0        0
-; .byte %10000010 ; |        █|████████  +8        1
-; .byte %10000010 ; |        █|████████  +8        1
-; .byte %10000010 ; |        █|████████  +8        1
-; .byte %10000010 ; |        █|█ ██████  +8        1
-; .byte %00       ; |         |███████    0        0
-; .ds 1           ; |         |  
 ;                   |         | ^ █ sprite pixels (GRP0)
 ;                       ^ 
 ;               █ missile pixels and 
 ;               ▒ shifted sprite pixels (GRP0 after HMOVE)
 
+DINO_MIS_SIZE:
+  .ds 1           ;  012345678         offset    size (NUSIZE bits 5,4)
+  .byte %00       ; |    ▒▒   |██         0        0
+  .byte %00       ; |    ▒    |█          0        0
+  .byte %00       ; |    ▒▒   |█          0        0
+  .byte %00       ; |    ▒▒▒ ▒|█          0        0
+  .byte %00       ; |   ▒▒▒▒▒▒|██         0        0
+  .byte %11100110 ; |  █▒▒▒▒▒▒|██        +2        1 or more
+  .byte %11111010 ; | ███X▒▒▒▒|███       +1        4 or rmore
+  .byte %11111110 ; | █████▒▒▒|███ █     +1        8
+  .byte %11110110 ; | ██  █▒▒▒|█████     +1        2
+  .byte %11110010 ; | █   ^▒▒▒|███       +1        1
+  .byte %11110010 ; | █   | ▒▒|███       +1        1
+  .byte %00       ; |     ?  ▒|██████     0        0
+  .byte %00       ; |        ▒|████       0        0
+  .byte %10000010 ; |        █|████████  +8        1
+  .byte %10000010 ; |        █|████████  +8        1
+  .byte %10000010 ; |        █|████████  +8        1
+  .byte %10000010 ; |        █|█ ██████  +8        1
+  .byte %00       ; |         |███████    0        0
+  .ds 1           ; |         |  
+;                   |         | ^ █ sprite pixels (GRP0)
+;                       ^ 
+;               █ missile pixels and 
+;               ▒ shifted sprite pixels (GRP0 after HMOVE)
 ;=============================================================================
 ; ROM SETUP
 ;=============================================================================
