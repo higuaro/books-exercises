@@ -207,13 +207,15 @@ kernel:
   ldy #SKY_KERNEL_LINES    ; 3  The sky is 31 2x scanlines
 
   ; T0D0: set the coarse position of the cactus/pterodactile
+
   sta WSYNC                ; 3
 
-.sky_kernel:;----->>> 31 2x scanlines <<<-----
-  ; 1st scanline =============
-  tya                                   ; 2 - A = current scanline (Y)
+.sky_kernel: ;-------------------->>> 31 2x scanlines <<<--------------------
+
+  ; 1st scanline ==============================================================
+  tya                                   ; 2   A = current scanline (Y)
   sec                                   ; 2
-  sbc DINO_BOTTOM_Y                     ; 3 - A = X - DINO_BOTTOM_Y
+  sbc DINO_BOTTOM_Y                     ; 3   A = X - DINO_BOTTOM_Y
   adc #DINO_HEIGHT                      ; 2
   bcc __y_not_within_dino               ; 2/3
   lda (PTR_DINO_SPRITE),y               ; 5+
@@ -221,10 +223,10 @@ kernel:
   ;lda #2 
   lda (PTR_DINO_MIS),y                  ; 5+
   sta ENAM0
-  asl
-  asl
-  and %00011000
-  sta NUSIZ0
+  ;asl
+  ;asl
+  ;and %00011000
+  ;sta NUSIZ0
 
   lda #0                                ; 2
   sta HMP0                              ; 3
@@ -235,10 +237,13 @@ __y_not_within_dino:
   sta WSYNC                             ; 3
   sta HMOVE                             ; 3
 
-  ; 2nd scanline =============
-  INSERT_NOPS 10                        ; 24
-  lda (PTR_DINO_OFFSET),y             ; 5+
+  ; 2nd scanline ==============================================================
+  INSERT_NOPS 10                        ; 24  24 cycles before using HMOVE reg
+  lda (PTR_DINO_OFFSET),y               ; 5+
   sta HMP0                              ; 3
+  lda (PTR_DINO_MIS),y                  ; 5+
+  and #%11110000                        ; 2
+  ;sta HMM0                              ; 3
 
   sta WSYNC                             ; 3
   sta HMOVE                             ; 3
@@ -246,20 +251,8 @@ __y_not_within_dino:
   dey                                   ; 2
   bne .sky_kernel                       ; 2/3
 
-  ;ldx #SKY_KERNEL_LINES  ; 31 2x scan-lines atm
-.cactus_kernel:; ----->>> 31 2x scanlines <<<-----
+.cactus_kernel: ;-------------------->>> 31 2x scanlines <<<-------------------
   DEBUG_SUB_KERNEL #$90, #62
-  ; txa  ; A <- current scanline (Y)
-  ; sbc DINO_BOTTOM_Y ; dino bottom y + 1
-  ; adc #DINO_HEIGHT+1
-  ; bcc __skip_dino_in_catcus
-  ; tay
-  ; lda (PTR_DINO_SPRITE),y
-  ; sta GRP0
-
-; __skip_dino_in_catcus:
-;   dex
-;   bne .cactus_kernel
 
 .floor_kernel:
   DEBUG_SUB_KERNEL #$AA, #1
@@ -415,80 +408,31 @@ DINO_MIS_OFFSET:
 ;  |-- 9 px -|                 |-- 9 px -|
 ;   012345678                   012345678       X means overlapping pixel
 
-;  .ds 1           ;  012345678         offset    size (NUSIZE bits 5,4)
-;  .byte %00       ; |    ▒▒   |██         0        0
-;  .byte %00       ; |    ▒    |█          0        0
-;  .byte %00       ; |    ▒▒   |█          0        0
-;  .byte %00       ; |    ▒▒▒ ▒|█          0        0
-;  .byte %00       ; |   ▒▒▒▒▒▒|██         0        0
-;  .byte %11100110 ; |  █▒▒▒▒▒▒|██        +2        1 or more
-;  .byte %11111010 ; | ███X▒▒▒▒|███       +1        4 or rmore
-;  .byte %11111110 ; | █████▒▒▒|███ █     +1        8
-;  .byte %11110110 ; | ██  █▒▒▒|█████     +1        2
-;  .byte %11110010 ; | █   ^▒▒▒|███       +1        1
-;  .byte %11110010 ; | █   | ▒▒|███       +1        1
-;  .byte %00       ; |     ?  ▒|██████     0        0
-;  .byte %00       ; |        ▒|████       0        0
-;  .byte %10000010 ; |        █|████████  +8        1
-;  .byte %10000010 ; |        █|████████  +8        1
-;  .byte %10000010 ; |        █|████████  +8        1
-;  .byte %10000010 ; |        █|█ ██████  +8        1
-;  .byte %00       ; |         |███████    0        0
-;  .ds 1           ; |         |  
-;                   |         | ^ █ sprite pixels (GRP0)
-;                       ^ 
-;               █ missile pixels and 
-;               ▒ shifted sprite pixels (GRP0 after HMOVE)
   .ds 1           ;  012345678         offset    size (NUSIZE bits 5,4)
-  .byte %00       ; |    ▒▒   |██         0        0
-  .byte %00       ; |    ▒    |█          0        0
-  .byte %00       ; |    ▒▒   |█          0        0
-  .byte %00       ; |    ▒▒▒ ▒|█          0        0
-  .byte %00       ; |   ▒▒▒▒▒▒|██         0        0
-  .byte %11100010 ; |  █▒▒▒▒▒▒|██        +2        1 or more
-  .byte %11110010 ; | ███X▒▒▒▒|███       +1        4 or rmore
-  .byte %11110010 ; | █████▒▒▒|███ █     +1        8
-  .byte %11110010 ; | ██  █▒▒▒|█████     +1        2
-  .byte %11110010 ; | █   ^▒▒▒|███       +1        1
-  .byte %11110010 ; | █   | ▒▒|███       +1        1
-  .byte %00       ; |     ?  ▒|██████     0        0
-  .byte %00       ; |        ▒|████       0        0
-  .byte %10000010 ; |        █|████████  +8        1
-  .byte %10000010 ; |        █|████████  +8        1
-  .byte %10000010 ; |        █|████████  +8        1
-  .byte %10000010 ; |        █|█ ██████  +8        1
-  .byte %00       ; |         |███████    0        0
-  .ds 1           ; |         |  
+  .byte %00000000 ; |    ▒▒   |██         0        0
+  .byte %00000000 ; |    ▒    |█          0        0
+  .byte %00000000 ; |    ▒▒   |█          0        0
+  .byte %00000000 ; |    ▒▒▒ ▒|█          0        0
+  .byte %00000000 ; |   ▒▒▒▒▒▒|██         0        0
+  .byte %00000010 ; |  █▒▒▒▒▒▒|██        +2        1 or more
+  .byte %00000010 ; | ███X▒▒▒▒|███       +1        4 or rmore
+  .byte %00000010 ; | █████▒▒▒|███ █     +1        8
+  .byte %00000010 ; | ██  █▒▒▒|█████     +1        2
+  .byte %00000010 ; | █   ^▒▒▒|███       +1        1
+  .byte %00000010 ; | █   | ▒▒|███       +1        1
+  .byte %00000000 ; |     ?  ▒|██████     0        0
+  .byte %00000000 ; |        ▒|████       0        0
+  .byte %00000010 ; |        █|████████  +8        1
+  .byte %00000010 ; |        █|████████  +8        1
+  .byte %00000010 ; |        █|████████  +8        1
+  .byte %00000010 ; |        █|█ ██████  +8        1
+  .byte %00000000 ; |         |███████    0        0
+  .ds 1           ; |         |
 ;                   |         | ^ █ sprite pixels (GRP0)
-;                       ^ 
-;               █ missile pixels and 
+;                       ^
+;               █ missile pixels and
 ;               ▒ shifted sprite pixels (GRP0 after HMOVE)
 
-DINO_MIS_SIZE:
-  .ds 1           ;  012345678         offset    size (NUSIZE bits 5,4)
-  .byte %00       ; |    ▒▒   |██         0        0
-  .byte %00       ; |    ▒    |█          0        0
-  .byte %00       ; |    ▒▒   |█          0        0
-  .byte %00       ; |    ▒▒▒ ▒|█          0        0
-  .byte %00       ; |   ▒▒▒▒▒▒|██         0        0
-  .byte %11100110 ; |  █▒▒▒▒▒▒|██        +2        1 or more
-  .byte %11111010 ; | ███X▒▒▒▒|███       +1        4 or rmore
-  .byte %11111110 ; | █████▒▒▒|███ █     +1        8
-  .byte %11110110 ; | ██  █▒▒▒|█████     +1        2
-  .byte %11110010 ; | █   ^▒▒▒|███       +1        1
-  .byte %11110010 ; | █   | ▒▒|███       +1        1
-  .byte %00       ; |     ?  ▒|██████     0        0
-  .byte %00       ; |        ▒|████       0        0
-  .byte %10000010 ; |        █|████████  +8        1
-  .byte %10000010 ; |        █|████████  +8        1
-  .byte %10000010 ; |        █|████████  +8        1
-  .byte %10000010 ; |        █|█ ██████  +8        1
-  .byte %00       ; |         |███████    0        0
-  .ds 1           ; |         |  
-;                   |         | ^ █ sprite pixels (GRP0)
-;                       ^ 
-;               █ missile pixels and 
-;               ▒ shifted sprite pixels (GRP0 after HMOVE)
 ;=============================================================================
 ; ROM SETUP
 ;=============================================================================
