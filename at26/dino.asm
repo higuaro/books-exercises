@@ -29,7 +29,7 @@
     sta .POINTER+1
   ENDM
 
-  MAC INSERT_NOPS  ; insert n nops 
+  MAC INSERT_NOPS  ; insert N nops
 .NUM_NOPS SET {1}
     REPEAT .NUM_NOPS
       nop
@@ -217,23 +217,29 @@ kernel:
   sec                                   ; 2
   sbc DINO_BOTTOM_Y                     ; 3   A = X - DINO_BOTTOM_Y
   adc #DINO_HEIGHT                      ; 2
-  bcc __y_not_within_dino               ; 2/3
+  bcs __y_within_dino                   ; 2/3
+
+__y_not_within_dino:
+  lda #0                                ; 3   Disable the misile for P0
+  sta ENAM0                             ; 3
+  jmp __end_of_scanline                 ; 3
+
+__y_within_dino:
   lda (PTR_DINO_SPRITE),y               ; 5+
   sta GRP0                              ; 3
-  ;lda #2 
-  lda (PTR_DINO_MIS),y                  ; 5+
+  lda #0
+  ;lda (PTR_DINO_MIS),y                  ; 5+
   sta ENAM0
   ;asl
   ;asl
   ;and %00011000
   ;sta NUSIZ0
 
-  lda #0                                ; 2
+  ;lda #0                                ; 2
   sta HMP0                              ; 3
   sta HMM0
 
-__y_not_within_dino:
-
+__end_of_scanline:
   sta WSYNC                             ; 3
   sta HMOVE                             ; 3
 
