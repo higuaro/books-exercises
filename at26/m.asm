@@ -54,9 +54,9 @@ _vblank_and_vsync:
 
   insert_nops #5
 
+  sta RESM0
   sta RESP0
   ;nop
-  sta RESM0
 
 
 __vblank_tmr:
