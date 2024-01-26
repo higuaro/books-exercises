@@ -63,7 +63,7 @@ CACTUS_KERNEL_LINES = #62
   ORG $80
 
 RND_SEED .word           ; 2 bytes
-DINO_BOTTOM_Y .byte      ; 3 bytes DINO_Y + DINO_HEIGHT
+DINO_TOP_Y .byte      ; 3 bytes DINO_Y + DINO_HEIGHT
 BG_COLOUR .byte          ; 4 bytes
 PTR_DINO_SPRITE .word    ; 6 bytes
 PTR_DINO_OFFSET .word  ; 8 bytes
@@ -108,7 +108,7 @@ __clear_mem:
   ; GAME INITIALIZATION
   ; -----------------------
   lda #DINO_POS_Y+#DINO_HEIGHT
-  sta DINO_BOTTOM_Y
+  sta DINO_TOP_Y
 
   lda #BKG_LIGHT_GRAY
   sta BG_COLOUR
@@ -215,7 +215,7 @@ kernel:
   ; 1st scanline ==============================================================
   tya                                   ; 2   A = current scanline (Y)
   sec                                   ; 2
-  sbc DINO_BOTTOM_Y                     ; 3   A = X - DINO_BOTTOM_Y
+  sbc DINO_TOP_Y                        ; 3 - A = X - DINO_TOP_Y
   adc #DINO_HEIGHT                      ; 2
   bcs __y_within_dino                   ; 2/3
 
@@ -227,8 +227,8 @@ __y_not_within_dino:
 __y_within_dino:
   lda (PTR_DINO_SPRITE),y               ; 5+
   sta GRP0                              ; 3
-  lda #0
-  ;lda (PTR_DINO_MIS),y                  ; 5+
+  lda #2
+  lda (PTR_DINO_MIS),y                  ; 5+
   sta ENAM0
   ;asl
   ;asl
@@ -244,7 +244,7 @@ __end_of_scanline:
   sta HMOVE                             ; 3
 
   ; 2nd scanline ==============================================================
-  INSERT_NOPS 10                        ; 24  24 cycles before using HMOVE reg
+  INSERT_NOPS 10                        ; 20  20 cycles before using HMOVE reg
   lda (PTR_DINO_OFFSET),y               ; 5+
   sta HMP0                              ; 3
   lda (PTR_DINO_MIS),y                  ; 5+
