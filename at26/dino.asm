@@ -162,12 +162,13 @@ __vsync:
   lda #43
   sta TIM64T
 
+  sta HMCLR             ; Clear horizontal motion registers
+
   ; -----------------------
   ; FRAME SETUP/LOGIC
   ; -----------------------
   lda #BKG_LIGHT_GRAY   ;
   sta COLUBK            ; Set initial background
-  sta HMCLR             ; Clear horizontal motion registers
 
   lda #0
 __vblank:
@@ -220,24 +221,29 @@ kernel:
   bcs __y_within_dino                   ; 2/3
 
 __y_not_within_dino:
+  lda #BKG_LIGHT_GRAY
+  sta COLUBK
   lda #0                                ; 3   Disable the misile for P0
   sta ENAM0                             ; 3
   jmp __end_of_scanline                 ; 3
 
 __y_within_dino:
+  lda #2
+  sta ENAM0
+  lda #23
+  sta COLUBK
+
   lda (PTR_DINO_SPRITE),y               ; 5+
   sta GRP0                              ; 3
-  lda #2
-  lda (PTR_DINO_MIS),y                  ; 5+
-  sta ENAM0
+  ;lda (PTR_DINO_MIS),y                  ; 5+
   ;asl
   ;asl
   ;and %00011000
   ;sta NUSIZ0
 
-  ;lda #0                                ; 2
+  lda #0                                ; 2
   sta HMP0                              ; 3
-  sta HMM0
+  ;sta HMM0
 
 __end_of_scanline:
   sta WSYNC                             ; 3

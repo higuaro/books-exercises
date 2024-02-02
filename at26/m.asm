@@ -45,6 +45,8 @@ _vblank_and_vsync:
   lda #43      ;
   sta TIM64T   ; timer 64 starts ticking
 
+  sta HMCLR             ; Clear horizontal motion registers
+
   ; frame config
   lda #84
   sta COLUBK
@@ -77,15 +79,23 @@ _kernel:
   cmp #50
   bcc _no_paint
 
+  lda #34
+  sta COLUBK
+
   lda #2
   sta ENAM0
   lda #%11111110
   sta GRP0
+  lda #2
+  sta HMM0                              ; 3
   jmp _painted
 
   ; else
 
 _no_paint:
+  lda #84
+  sta COLUBK
+
   lda #0
   sta GRP0
   sta ENAM0
@@ -94,6 +104,7 @@ _painted:
 
   dey
   sta WSYNC
+  sta HMOVE
   bne _kernel
 
 _overscan:
