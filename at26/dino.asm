@@ -61,12 +61,16 @@ CACTUS_KERNEL_LINES = #62
   SEG.U variables
   ORG $80
 
+DINO_TOP_Y .byte         ; 1 byte
+BG_COLOUR .byte          ; 1 byte
+DINO_SPRITE .byte        ; 1 byte
+DINO_SPRITE_OFFSET .byte    ; 1 byte
+MISILE_P0 .byte          ; 1 byte
+PTR_DINO_SPRITE .word    ; 2 bytes
+PTR_DINO_OFFSET .word    ; 2 bytes
+PTR_DINO_MIS .word       ; 2 bytes
 RND_SEED .word           ; 2 bytes
-DINO_TOP_Y .byte      ; 3 bytes DINO_Y + DINO_HEIGHT
-BG_COLOUR .byte          ; 4 bytes
-PTR_DINO_SPRITE .word    ; 6 bytes
-PTR_DINO_OFFSET .word  ; 8 bytes
-PTR_DINO_MIS .word  ; 10 bytes
+
 
 ;=============================================================================
 ; ROM / GAME CODE
@@ -117,9 +121,9 @@ __clear_mem:
   lda #>[DINO_SPRITE_1 - DINO_POS_Y]
   sta PTR_DINO_SPRITE+1
 
-  lda #<[DINO_SPRITE_OFFSET - DINO_POS_Y]
+  lda #<[DINO_SPRITE_1_OFFSET - DINO_POS_Y]
   sta PTR_DINO_OFFSET
-  lda #>[DINO_SPRITE_OFFSET - DINO_POS_Y]
+  lda #>[DINO_SPRITE_1_OFFSET - DINO_POS_Y]
   sta PTR_DINO_OFFSET+1
 
   lda #<[DINO_MIS_OFFSET - DINO_POS_Y]
@@ -220,25 +224,30 @@ kernel:
   bcs __y_within_dino                   ; 2/3
 
 __y_not_within_dino:
-  lda #BKG_LIGHT_GRAY
-  sta COLUBK
   lda #0                                ; 3   Disable the misile for P0
-  sta ENAM0                             ; 3
+  sta DINO_SPRITE                             ; 3
+  sta DINO_SPRITE_OFFSET
+  sta MISILE_P0
+  ;sta HMP0                              ; 3
+  ;sta HMM0                              ; 3
   jmp __end_of_scanline                 ; 3
 
 __y_within_dino:
   lda #2
-  sta ENAM0
-  lda #23
-  sta COLUBK
+  sta MISILE_P0
 
   lda (PTR_DINO_SPRITE),y               ; 5+
-  sta GRP0                              ; 3
+  sta DINO_SPRITE                        ; 3
+  lda (PTR_DINO_OFFSET),y               ; 5+
+  sta DINO_SPRITE_OFFSET                 ; 3
   ;lda (PTR_DINO_MIS),y                  ; 5+
   ;asl
   ;asl
   ;and %00011000
   ;sta NUSIZ0
+
+  ;lda (PTR_DINO_MIS),y                  ; 5+
+  ;and #%11110000                        ; 2
 
   lda #0                                ; 2
   sta HMP0                              ; 3
@@ -249,12 +258,13 @@ __end_of_scanline:
   sta HMOVE                             ; 3
 
   ; 2nd scanline ==============================================================
-  INSERT_NOPS 10                        ; 20  20 cycles before using HMOVE reg
-  lda (PTR_DINO_OFFSET),y               ; 5+
+  lda DINO_SPRITE                       ; 3
+  sta GRP0                              ; 3
+  lda MISILE_P0                         ; 3
+  sta ENAM0                             ; 3
+  lda DINO_SPRITE_OFFSET                ; 3
+  INSERT_NOPS 5                         ; 10
   sta HMP0                              ; 3
-  lda (PTR_DINO_MIS),y                  ; 5+
-  and #%11110000                        ; 2
-  ;sta HMM0                              ; 3
 
   sta WSYNC                             ; 3
   sta HMOVE                             ; 3
@@ -368,7 +378,7 @@ DINO_SPRITE_DEAD:
   .byte %10111110   ;  █ █████
   .ds 1
 
-DINO_SPRITE_OFFSET:
+DINO_SPRITE_1_OFFSET:
 ;       LEFT  <---------------------------------------------------------> RIGHT
 ;offset (px)  | -7  -6  -5  -4  -3  -2  -1  0  +1  +2  +3  +4  +5  +6  +7  +8
 ;value in hex | 70  60  50  40  30  20  10 00  F0  E0  D0  C0  B0  A0  90  80
