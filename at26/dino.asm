@@ -235,12 +235,11 @@ __y_not_within_dino:
 __y_within_dino:
   lda #2
   sta MISILE_P0
-  lda #0                                ; 2
-  sta HMP0                              ; 3
   lda (PTR_DINO_SPRITE),y               ; 5+
   sta DINO_SPRITE                        ; 3
   lda (PTR_DINO_OFFSET),y               ; 5+
-  sta DINO_SPRITE_OFFSET                 ; 3
+  sta HMP0                              ; 3
+  ;sta DINO_SPRITE_OFFSET                 ; 3
   ;lda (PTR_DINO_MIS),y                  ; 5+
   ;asl
   ;asl
@@ -261,10 +260,9 @@ __end_of_scanline:
   sta GRP0                              ; 3
   lda MISILE_P0                         ; 3
   sta ENAM0                             ; 3
-  lda DINO_SPRITE_OFFSET                ; 3
   lda #0
   sta HMP0                              ; 3
-  INSERT_NOPS 3                         ; 10
+  INSERT_NOPS 10                         ; 20
 
   sta WSYNC                             ; 3
   sta HMOVE                             ; 3
