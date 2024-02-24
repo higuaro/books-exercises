@@ -384,22 +384,22 @@ DINO_SPRITE_1_OFFSET:
   .byte $00  ;  ▒▒   ██    |  -5
   .byte $00  ;  ▒    █     |  -5
   .byte $00  ;  ▒▒   █     |  -5
-  .byte $00  ;  ▒▒▒ ▒█     |  -5
-  .byte $F0  ;  ▒▒▒▒▒▒██   |  -6
+  .byte $F0  ;  ▒▒▒ ▒█     |  -5
   .byte $00  ;  ▒▒▒▒▒▒██   |  -6
-  .byte $10  ;  ▒▒▒▒▒███   |  -5
-  .byte $20  ;  ▒▒▒███ █   |  -3
+  .byte $10  ;  ▒▒▒▒▒▒██   |  -6
+  .byte $20  ;  ▒▒▒▒▒███   |  -5
+  .byte $00  ;  ▒▒▒███ █   |  -3
   .byte $00  ;  ▒▒▒█████   |  -3
-  .byte $00  ;  ▒▒▒███     |  -3
+  .byte $10  ;  ▒▒▒███     |  -3
   .byte $10  ;  ▒▒███      |  -2
   .byte $00  ;  ▒██████    |  -1
-  .byte $00  ;  ▒████      |  -1
-  .byte $10  ;  ████████   |   0 <-- Any pixel offset has to be applied on the
-  .byte $00  ;  ████████   |   0     previous scanline so it takes effect on
-  .byte $00  ;  ████████   |   0     the next scanline, then it remains for the
-  .byte $00  ;  █ ██████   |   0     next scanlines
+  .byte $10  ;  ▒████      |  -1 <-- Any pixel offset applied in the current
+  .byte $00  ;  ████████   |   0     2 line kernel, remains for the next
+  .byte $00  ;  ████████   |   0     scanlines
+  .byte $00  ;  ████████   |   0
+  .byte $00  ;  █ ██████   |   0
   .byte $00  ;  ███████    |   0
-  .ds 1      ; <- this resets the HMP0 register back to 0
+  .ds 1      ;
 DINO_MIS_OFFSET:
 ;
 ; M0 is strobed at a moment T
