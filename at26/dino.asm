@@ -392,7 +392,7 @@ DINO_SPRITE_1_OFFSET:
   .byte $00  ;  ▒▒▒█████   |  -3
   .byte $00  ;  ▒▒▒███     |  -3
   .byte $10  ;  ▒▒███      |  -2
-  .byte $10  ;  ▒██████    |  -1
+  .byte $00  ;  ▒██████    |  -1
   .byte $00  ;  ▒████      |  -1
   .byte $10  ;  ████████   |   0 <-- Any pixel offset has to be applied on the
   .byte $00  ;  ████████   |   0     previous scanline so it takes effect on
