@@ -64,7 +64,7 @@ CACTUS_KERNEL_LINES = #62
 DINO_TOP_Y .byte         ; 1 byte
 BG_COLOUR .byte          ; 1 byte
 DINO_SPRITE .byte        ; 1 byte
-DINO_SPRITE_OFFSET .byte    ; 1 byte
+DINO_SPRITE_OFFSET .byte ; 1 byte
 MISILE_P0 .byte          ; 1 byte
 PTR_DINO_SPRITE .word    ; 2 bytes
 PTR_DINO_OFFSET .word    ; 2 bytes
@@ -233,23 +233,21 @@ __y_not_within_dino:
   jmp __end_of_scanline                 ; 3
 
 __y_within_dino:
-  lda #2
-  sta MISILE_P0
-  lda (PTR_DINO_SPRITE),y               ; 5+
-  sta DINO_SPRITE                        ; 3
   lda (PTR_DINO_OFFSET),y               ; 5+
   sta HMP0                              ; 3
-  ;sta DINO_SPRITE_OFFSET                 ; 3
-  ;lda (PTR_DINO_MIS),y                  ; 5+
+  lda (PTR_DINO_SPRITE),y               ; 5+
+  sta DINO_SPRITE                       ; 3
+  lda (PTR_DINO_MIS),y                  ; 5+
+  sta MISILE_P0                         ; 3
+  and #%11110000                        ; 2
+  sta HMM0                              ; 3
   ;asl
   ;asl
   ;and %00011000
   ;sta NUSIZ0
 
   ;lda (PTR_DINO_MIS),y                  ; 5+
-  ;and #%11110000                        ; 2
 
-  ;sta HMM0
 
 __end_of_scanline:
   sta WSYNC                             ; 3
@@ -262,6 +260,7 @@ __end_of_scanline:
   sta ENAM0                             ; 3
   lda #0
   sta HMP0                              ; 3
+  sta HMM0
   INSERT_NOPS 10                         ; 20
 
   sta WSYNC                             ; 3
@@ -398,7 +397,7 @@ DINO_SPRITE_1_OFFSET:
   .byte $00  ;  ████████   |   0     scanlines
   .byte $00  ;  ████████   |   0
   .byte $00  ;  █ ██████   |   0
-  .byte $00  ;  ███████    |   0
+  .byte $10  ;  ███████    |   0
   .ds 1      ;
 DINO_MIS_OFFSET:
 ;
@@ -444,7 +443,7 @@ DINO_MIS_OFFSET:
   .byte %00000010 ; |        █|████████  +8        1
   .byte %00000010 ; |        █|████████  +8        1
   .byte %00000010 ; |        █|████████  +8        1
-  .byte %00000010 ; |        █|█ ██████  +8        1
+  .byte %10000010 ; |        █|█ ██████  +8        1
   .byte %00000000 ; |         |███████    0        0
   .ds 1           ; |         |
 ;                   |         | ^ █ sprite pixels (GRP0)
